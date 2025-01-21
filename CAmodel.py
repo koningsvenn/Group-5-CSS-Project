@@ -30,17 +30,15 @@ def transaction_rule(grid, delta_m, p_t):
             if R < p_t / 2 + p_t:
                 grid[x, y] += delta_m
                 grid[nx, ny] -= delta_m
-                
-        elif R < p_t:
-            grid[x, y] -= delta_m
-            grid[nx, ny] += delta_m
+            elif R < p_t:
+                grid[x, y] -= delta_m
+                grid[nx, ny] += delta_m
 
         elif m_i <= m_j:
             if R < p_t / 2:
                 grid[x, y] += delta_m
                 grid[nx, ny] -= delta_m
-                
-        elif R < p_t:
+            elif R < p_t:
                 grid[x, y] -= delta_m
                 grid[nx, ny] += delta_m
 
