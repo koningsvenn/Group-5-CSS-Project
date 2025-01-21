@@ -1,3 +1,5 @@
+import numpy as np
+
 def transaction_rule(grid, delta_m, p_t):
     height, width = grid.shape
 
@@ -41,5 +43,22 @@ def transaction_rule(grid, delta_m, p_t):
             elif R < p_t:
                 grid[x, y] -= delta_m
                 grid[nx, ny] += delta_m
+
+    return grid
+
+def tax_and_charity(grid, tax_rate=0.1, charity_rate=0.1):
+    height, width = grid.shape
+
+    tax = grid * tax_rate
+
+    grid -= tax
+
+    total_tax_collected = np.sum(tax)
+
+    charity_pool = total_tax_collected * charity_rate
+
+    redistribution = charity_pool / (height * width)
+
+    grid += redistribution
 
     return grid
