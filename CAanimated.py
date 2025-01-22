@@ -9,24 +9,51 @@ import os
 
 
 """set up the grid"""
+
+money_of_agent = {}
+
 def initialize_grid(height, width, fall_heigth, density):
     """Create a height x width grid with zeros representing empty cells or integers 
     to represent person size"""
+
+    global money_of_agent
+    money_of_agent.clear()
     #empty grid
     grid = np.zeros((height, width))  
-    drops_amount = int(height * width * density) 
+    no_of_agents = int(height * width * density) 
     
     #select random coordinates for each person
-    drops = 0
-    while drops < drops_amount:
+    agents = 0
+    while agents < no_of_agents:
         n = random.randint(0, width - 1)
         m = random.randint(0, height - 1)
 
         if grid[m, n] == 0:
-            grid[m, n] = 1  
-            drops += 1
-        
+            grid[m, n] = 1 
+            # add agent info
+            location = [m, n]
+            money = 2
+            money_of_agent[agents] = [location, money]
+            # money_of_agent[(m, n)] = 2
+        agents += 1
+    print(money_of_agent)
     return grid 
+
+# def print_money_of_agent():
+#     """
+#     Prints the global dictionary of money_of_agent.
+#     """
+#     global money_of_agent
+#     print("money_of_agent:")
+#     for coord, value in money_of_agent.items():
+#         print(f"ID: {coord}, Value: {value}")
+
+grid = initialize_grid(15, 15, 0, density=0.5)
+print("Initial grid:")
+print(grid)
+print("\nmoney_of_agent:")
+print_money_of_agent()
+
 
 
 def move(m, n, height, width):
@@ -47,7 +74,7 @@ def time_step_randwalk(grid, probablility_move,showmovements):
     new_grid = np.zeros_like(grid)  # initialize a new grid for the updated state
     
     movements = []  # list to track movements
-    occupied_count = 0  # counter for occupied cells
+    occupied_count = 0  # counter for money_of_agent
     visited = set()  # set to track cells that are already occupied in the new grid
 
     # First pass: mark all existing positions as visited
@@ -55,37 +82,60 @@ def time_step_randwalk(grid, probablility_move,showmovements):
         for n in range(width):
             if grid[m, n] == 1:
                 visited.add((m, n))
-
     # loop over all cells
     for m in range(height):
         for n in range(width):
             if grid[m, n] == 1:  # if there is a person in a cell
                 occupied_count += 1  # increment occupied cell count
+                loc = [m, n]
+                agent_id = money_of_agent.keys[money_of_agent()[0]==loc]
 
                 # random movement
                 if random.random() < probablility_move:  # move with some probability
                     m_new, n_new = globals()['move'](m, n, height, width)  # explicitly use the global move function
 
+
                     # add the person to the grid if the cell is empty and not visited
                     if new_grid[m_new, n_new] == 0 and (m_new, n_new) not in visited:
+                        new_loc = [m_new, n_new]
                         new_grid[m_new, n_new] = 1
                         visited.add((m_new, n_new))  # mark the cell as visited
                         movements.append(((m, n), (m_new, n_new)))  # log movement
+                        # TODO: implement transactions and change later
+                        money_of_agent[agent_id][0] = new_loc  # update the agent's location
                     else:
                         new_grid[m, n] = 1  # stay in place if target is occupied
                         movements.append(((m, n), (m, n)))  # log no movement due to target occupied
                 else:
                     new_grid[m, n] = 1  # stay in place
                     movements.append(((m, n), (m, n)))  # log no movement
-
+    
+    
+    
     if showmovements:
-        print(f"Occupied Cells: {occupied_count}")
+        print(f"money_of_agent: {occupied_count}")
         print("Movements:")
         for move in movements:
             print(f"{move[0]} -> {move[1]}")
 
     return new_grid
 
+def neighbour_figure_outer(new_grid, money_of_agents):
+    # Return the neighbours of each agent in the grid as a dictionary.
+    neighbours = {}
+    for agent_id, value in money_of_agents.items():
+        m, n = value[0]
+        neighbours[agent_id] = []
+        for i in range(-1, 2):
+            for j in range(-1, 2):
+                if i == 0 and j == 0:
+                    continue
+                m_new = (m + i) % new_grid.shape[0]
+                n_new = (n + j) % new_grid.shape[1]
+                if new_grid[m_new, n_new] == 1:
+                    # add agent_id value based on m_new and n_new
+                    neighbours[agent_id].append((m_new, n_new))
+    
 
 """Assign a color based on wealth"""
 def get_shades_of_green(n):
@@ -116,7 +166,7 @@ def animate_CA(initial_grid, steps,showmovements, interval, probablility_move,):
     #lists to collect data
     averages = []
     raind_count_list = []
-    total_drops_list = []
+    total_agents_list = []
     
     def update(frames):
         nonlocal grid
