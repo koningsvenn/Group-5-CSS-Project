@@ -7,10 +7,10 @@ import pandas as pd
 
 
 
-"""set up the grid"""
-
+# track money and position of each agent
 money_of_agent = {}
 
+"""set up the grid"""
 def initialize_grid(height, width, fall_heigth, density):
     """Create a height x width grid with zeros representing empty cells or integers 
     to represent person size"""
@@ -38,20 +38,99 @@ def initialize_grid(height, width, fall_heigth, density):
     print(money_of_agent)
     return grid 
 
-# def print_money_of_agent():
-#     """
-#     Prints the global dictionary of money_of_agent.
-#     """
-#     global money_of_agent
-#     print("money_of_agent:")
-#     for coord, value in money_of_agent.items():
-#         print(f"ID: {coord}, Value: {value}")
 
-grid = initialize_grid(15, 15, 0, density=0.5)
-print("Initial grid:")
-print(grid)
-print("\nmoney_of_agent:")
-print_money_of_agent()
+
+#--------------------------- NOT USED FUNCTIONS ATM ---------------------------
+def transaction_rule(grid, delta_m, p_t, p_l):
+    """Apply transaction rules between agents."""
+    height, width = grid.shape
+
+    for _ in range(height * width):
+        x, y = np.random.randint(0, height), np.random.randint(0, width)
+        dx, dy = np.random.choice([-1, 0, 1]), np.random.choice([-1, 0, 1])
+        nx, ny = (x + dx) % height, (y + dy) % width
+
+        if dx == 0 and dy == 0:
+            continue
+
+        m_i, m_j = grid[x, y], grid[nx, ny]
+
+        if m_i + m_j == 0:
+            continue
+
+        R = np.random.random()
+
+        if m_i == 0 and R < p_t / 2:
+            grid[x, y] += delta_m
+            grid[nx, ny] -= delta_m
+        elif m_j == 0 and R < p_t / 2:
+            grid[x, y] -= delta_m
+            grid[nx, ny] += delta_m
+        elif m_i > m_j:
+            if R < p_t / 2 + p_l:
+                grid[x, y] += delta_m
+                grid[nx, ny] -= delta_m
+            elif R < p_t:
+                grid[x, y] -= delta_m
+                grid[nx, ny] += delta_m
+        elif m_i <= m_j:
+            if R < p_t / 2 - p_l:
+                grid[x, y] += delta_m
+                grid[nx, ny] -= delta_m
+            elif R < p_t:
+                grid[x, y] -= delta_m
+                grid[nx, ny] += delta_m
+
+    return grid
+
+def tax(grid, psi_max, omega, delta_m):
+    """Apply tax rules."""
+    m_max = np.max(grid)
+    
+    # Handle the case where m_max is zero
+    if m_max == 0:
+        return grid  # No taxation if there is no wealth
+    
+    # Calculate tax liabilities
+    psi_i = ((grid / m_max) ** omega) * psi_max
+    tax_liabilities = psi_i * delta_m
+
+    # Avoid NaN or negative wealth
+    tax_liabilities = np.nan_to_num(tax_liabilities, nan=0.0, posinf=0.0, neginf=0.0)
+    grid -= tax_liabilities
+
+    total_tax_revenue = np.sum(tax_liabilities)
+
+    # Redistribute tax revenue equally
+    redistribution = total_tax_revenue / grid.size
+    grid += redistribution
+
+    # Ensure no NaN or negative values remain in the grid
+    grid = np.nan_to_num(grid, nan=0.0, posinf=0.0, neginf=0.0)
+    grid[grid < 0] = 0  # Prevent negative wealth
+
+    return grid
+
+def charity(grid, mr, mp, mc, pc):
+    """Apply charity rules."""
+    rich_agents = np.where(grid > mr)
+    total_charity = 0
+
+    for x, y in zip(rich_agents[0], rich_agents[1]):
+        if np.random.random() < pc:
+            donation = min(mc, grid[x, y])
+            grid[x, y] -= donation
+            total_charity += donation
+
+    poor_agents = np.where(grid < mp)
+    if len(poor_agents[0]) > 0:
+        redistribution = total_charity / len(poor_agents[0])
+        for x, y in zip(poor_agents[0], poor_agents[1]):
+            grid[x, y] += redistribution
+
+    return grid
+#--------------------------- NOT USED FUNCTIONS ATM ------------------------
+
 
 
 
@@ -66,6 +145,73 @@ def move(m, n, height, width):
     n_new = (n + direction[1]) % width   # keep within boundary
     
     return m_new, n_new
+
+def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
+    """
+    Perform economic transactions between neighboring agents.
+    Args:
+        grid: The grid representing agent positions.
+        money_of_agent: A dictionary mapping agent IDs to their location and money.
+        delta_m: Fixed amount of money transferred in a transaction.
+        p_t: Probability of a transaction occurring between neighbors.
+        p_i: Inequality parameter to control transaction probabilities.
+    Returns:
+        Updated money_of_agent dictionary.
+    """
+    height, width = grid.shape
+    visited = set()
+
+    # iterate over all agents
+    for agent_id, (location, money) in money_of_agent.items():
+        m, n = location
+        neighbors = []
+
+        # identify 8 neighbors (D2N8 model)
+        for i in range(-1, 2):
+            for j in range(-1, 2):
+                if i == 0 and j == 0:
+                    continue
+                m_new, n_new = (m + i) % height, (n + j) % width
+                if grid[m_new, n_new] == 1:  # check if a neighbor is present
+                    for neighbor_id, (neighbor_loc, neighbor_money) in money_of_agent.items():
+                        if neighbor_loc == [m_new, n_new]:
+                            neighbors.append((neighbor_id, neighbor_loc, neighbor_money))
+                            break
+
+        # perform transactions with neighbors
+        for neighbor_id, neighbor_loc, neighbor_money in neighbors:
+            if (agent_id, neighbor_id) in visited or (neighbor_id, agent_id) in visited:
+                continue  # avoid duplicate transactions
+            visited.add((agent_id, neighbor_id))
+
+            R = random.random()  # random probability
+            # transaction logic for the four cases
+            if money == 0 and neighbor_money == 0:  # case 1
+                continue
+            elif money == 0 and neighbor_money > 0:  # case 1
+                if R < p_t:  # agent Ai wins money
+                    money_of_agent[agent_id][1] += delta_m
+                    money_of_agent[neighbor_id][1] -= delta_m
+            elif money >= neighbor_money > 0:  # case 3
+                if R < (p_t / 2 + p_i):  # agent Ai wins money
+                    money_of_agent[agent_id][1] += delta_m
+                    money_of_agent[neighbor_id][1] -= delta_m
+                elif R < p_t:  # agent Ai loses money
+                    money_of_agent[agent_id][1] -= delta_m
+                    money_of_agent[neighbor_id][1] += delta_m
+            elif neighbor_money > money > 0:  # case 4
+                if R < (p_t / 2 - p_i):  # agent Ai wins money
+                    money_of_agent[agent_id][1] += delta_m
+                    money_of_agent[neighbor_id][1] -= delta_m
+                elif R < p_t:  # agent Ai loses money
+                    money_of_agent[agent_id][1] -= delta_m
+                    money_of_agent[neighbor_id][1] += delta_m
+
+            # ensure money remains non-negative
+            money_of_agent[agent_id][1] = max(0, money_of_agent[agent_id][1])
+            money_of_agent[neighbor_id][1] = max(0, money_of_agent[neighbor_id][1])
+
+    return money_of_agent
 
 def time_step_randwalk(grid, probablility_move,showmovements):
     """Perform a time step where the values move randomly without merging."""
@@ -87,7 +233,7 @@ def time_step_randwalk(grid, probablility_move,showmovements):
             if grid[m, n] == 1:  # if there is a person in a cell
                 occupied_count += 1  # increment occupied cell count
                 loc = [m, n]
-                agent_id = money_of_agent.keys[money_of_agent()[0]==loc]
+                agent_id = next((key for key, value in money_of_agent.items() if value[0] == loc), None)
 
                 # random movement
                 if random.random() < probablility_move:  # move with some probability
@@ -119,22 +265,6 @@ def time_step_randwalk(grid, probablility_move,showmovements):
 
     return new_grid
 
-def neighbour_figure_outer(new_grid, money_of_agents):
-    # Return the neighbours of each agent in the grid as a dictionary.
-    neighbours = {}
-    for agent_id, value in money_of_agents.items():
-        m, n = value[0]
-        neighbours[agent_id] = []
-        for i in range(-1, 2):
-            for j in range(-1, 2):
-                if i == 0 and j == 0:
-                    continue
-                m_new = (m + i) % new_grid.shape[0]
-                n_new = (n + j) % new_grid.shape[1]
-                if new_grid[m_new, n_new] == 1:
-                    # add agent_id value based on m_new and n_new
-                    neighbours[agent_id].append((m_new, n_new))
-    
 
 """Assign a color based on wealth"""
 def get_shades_of_green(n):
@@ -144,7 +274,8 @@ def get_shades_of_green(n):
     return [(start + (end - start) * i / (n - 1)).tolist() for i in range(n)]
 
 """Animate the CA to visualize what is happening"""
-def animate_CA(initial_grid, steps,showmovements, interval, probablility_move,):
+def animate_CA(initial_grid, steps,showmovements, interval, probablility_move, delta_m, p_t, p_l, psi_max, omega, mr, mp, mc, pc):
+
     """Animate the cellular automata, updating time step and cell values."""
     #set up colors and figure for the animation
     colors = get_shades_of_green(20) 
@@ -168,31 +299,37 @@ def animate_CA(initial_grid, steps,showmovements, interval, probablility_move,):
     total_agents_list = []
     
     def update(frames):
+        global money_of_agent  # access the global variable
         nonlocal grid
 
-        #perform a time-step
-        grid = time_step_randwalk(grid, probablility_move,showmovements)  
+        # Perform a time-step
+        grid = time_step_randwalk(grid, probablility_move, showmovements)
+        money_of_agent = economic_transaction(grid, money_of_agent, delta_m, p_t, p_l)
+        # print(money_of_agent)
+
+        # update the grid display
         matrix.set_array(grid)
-        # update text for each cell
+
+        # clear all text from the grid initially
         for i in range(grid.shape[0]):
             for j in range(grid.shape[1]):
-                val = grid[i, j]
-                text_color = 'white' if val > 2 else 'black'  # make values of person wealth white or black for contrast
-                text[i][j].set_text(f'{int(val)}' if val else '')
-                text[i][j].set_color(text_color)
-                text[i][j].set_visible(bool(val))  # show text only for non-zero values
+                text[i][j].set_text('')  # clear previous text
 
-        #add interesting data alculations here based on the grid
-        non_zero_elements = np.count_nonzero(grid)
-        average_size = np.sum(grid) / non_zero_elements if non_zero_elements else 0
-        averages.append(int(average_size))
+        # display money values for agents
+        for agent_id, (location, money) in money_of_agent.items():
+            m, n = location  # agent's location in the grid
+            text[m][n].set_text(f'{int(money)}')  # display agent's money
+            text[m][n].set_color('white' if money > 2 else 'black')  # adjust text color for better contrast
 
+        # update title and return all drawable elements
         ax.set_title(f"Economy Automata")
         return [matrix] + [txt for row in text for txt in row]
+
 
     ani = FuncAnimation(fig, update, frames=steps-1, interval=interval, blit=False, repeat=False) #average step -1 because the first frame is a step 
     plt.show()
     return averages #,return any data of interest from this function
+
 
 
 if __name__ == '__main__':
@@ -203,12 +340,22 @@ if __name__ == '__main__':
     steps = 100  # timesteps
     density = 0.2
     showmovements = False
-
+    delta_m = 1.0
+    p_t = 1.0
+    p_l = 1.0
+    psi_max = 1.0
+    omega = 1.0
+    mr = 1.0
+    mp = 1.0
+    mc = 1.0
+    pc = 1.0
+    
     """set up grid"""
     grid = initialize_grid(height, width, 0, density)  # init. the grid
 
     """start animation, any data of interest can be returned from animate_CA"""
-    averages = animate_CA(grid, steps,showmovements, interval=100, probablility_move=probablility_move)
+    averages = animate_CA(grid, steps,showmovements, interval=100, probablility_move=probablility_move, 
+                          delta_m=delta_m, p_t=p_t, p_l=p_l, psi_max=psi_max, omega=omega, mr=mr, mp=mp, mc=mc, pc=pc)
 
 
 
