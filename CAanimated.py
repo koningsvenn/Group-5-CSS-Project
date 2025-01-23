@@ -217,7 +217,7 @@ def get_shades_of_green(n):
     return [(start + (end - start) * i / (n - 1)).tolist() for i in range(n)]
 
 """Animate the CA to visualize what is happening"""
-def animate_CA(initial_grid, steps,showmovements, interval, probablility_move, delta_m=delta_m, p_t=p_t, p_l=p_l, psi_max=psi_max, omega=omega, mr=mr, mp=mp, mc=mc, pc=pc):
+def animate_CA(initial_grid, steps,showmovements, interval, probablility_move, delta_m, p_t, p_l, psi_max, omega, mr, mp, mc, pc):
     """Animate the cellular automata, updating time step and cell values."""
     #set up colors and figure for the animation
     colors = get_shades_of_green(20) 
