@@ -4,11 +4,10 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
-import datetime
-import os
 
 
-"""set up the grid"""
+
+"""Set up the grid"""
 def initialize_grid(height, width, fall_heigth, density):
     """Create a height x width grid with zeros representing empty cells or integers 
     to represent person size"""
@@ -27,7 +26,6 @@ def initialize_grid(height, width, fall_heigth, density):
             drops += 1
         
     return grid 
-
 
 def move(m, n, height, width):
     """Move the persons randomly."""
@@ -85,7 +83,6 @@ def time_step_randwalk(grid, probablility_move,showmovements):
             print(f"{move[0]} -> {move[1]}")
 
     return new_grid
-
 
 """Assign a color based on wealth"""
 def get_shades_of_green(n):
@@ -146,16 +143,13 @@ def animate_CA(initial_grid, steps,showmovements, interval, probablility_move,):
     return averages #,return any data of interest from this function
 
 
-
-
-
 if __name__ == '__main__':
     """input parameters"""
     height = 15
     width = 15
     probablility_move = 0.3  # chance of movement of indiviudual
     steps = 100  # timesteps
-    density = 0.5
+    density = 0.2
     showmovements = False
 
     """set up grid"""
