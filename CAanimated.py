@@ -68,6 +68,81 @@ def move(m, n, height, width):
     
     return m_new, n_new
 
+def transaction_rule(grid, delta_m, p_t, p_l):
+    """Apply transaction rules between the agents."""
+    for _ in range(height * width):
+        x, y = np.random.randint(0, height), np.random.randint(0, width)
+        dx, dy = np.random.choice([-1, 0, 1]), np.random.choice([-1, 0, 1])
+        nx, ny = (x + dx) % height, (y + dy) % width
+        if dx == 0 and dy == 0:
+            continue
+
+        m_i, m_j = grid[x, y], grid[nx, ny]
+
+        if m_i + m_j ==0:
+            continue
+
+        R = np.random.random()
+
+        if m_i == 0:
+            if R < p_t / 2:
+                grid[x, y] += delta_m
+                grid[nx, ny] -= delta_m
+
+        elif m_j == 0:
+            if R < p_t / 2:
+                grid[x, y] -= delta_m
+                grid[nx, ny] += delta_m
+
+        elif m_i > m_j:
+            if R < p_t / 2 + p_l:
+                grid[x, y] += delta_m
+                grid[nx, ny] -= delta_m
+            elif R < p_t:
+                grid[x, y] -= delta_m
+                grid[nx, ny] += delta_m
+
+        elif m_i <= m_j:
+            if R < p_t / 2 - p_l:
+                grid[x, y] += delta_m
+                grid[nx, ny] -= delta_m
+            elif R < p_t:
+                grid[x, y] -= delta_m
+                grid[nx, ny] += delta_m
+
+    return grid
+
+def tax(grid, psi_max, omega, delta_m):
+    """Apply tax rule."""
+    m_max = np.max(grid)
+    psi_i = ((grid / m_max) ** omega) * psi_max
+    tax_liabilities = psi_i * delta_m
+    grid -= tax_liabilities
+    total_tax_revenue = np.sum(tax_liabilities)
+    num_agents = grid.size
+    redistribution = total_tax_revenue / num_agents
+    grid += redistribution
+    return grid
+
+def charity(grid, mr, mp, mc, pc):
+    """Apply charity rule."""
+    rich_agents = np.where(grid > mr)
+    total_charity = 0
+    for x, y in zip(rich_agents[0], rich_agents[1]):
+        if np.random.random() < pc:
+            donation = min(mc, grid[x, y])
+            grid[x, y] -= donation
+            total_charity += donation
+
+    poor_agents = np.where(grid < mp)
+    num_poor_agents = len(poor_agents[0])
+    if num_poor_agents > 0:
+        redistribution = total_charity / num_poor_agents
+        for x, y in zip(poor_agents[0], poor_agents[1]):
+            grid[x, y] += redistribution
+
+    return grid
+
 def time_step_randwalk(grid, probablility_move,showmovements):
     """Perform a time step where the values move randomly without merging."""
     height, width = grid.shape
