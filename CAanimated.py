@@ -39,22 +39,93 @@ def initialize_grid(height, width, fall_heigth, density):
     print(money_of_agent)
     return grid 
 
-# def print_money_of_agent():
-#     """
-#     Prints the global dictionary of money_of_agent.
-#     """
-#     global money_of_agent
-#     print("money_of_agent:")
-#     for coord, value in money_of_agent.items():
-#         print(f"ID: {coord}, Value: {value}")
+#def print_money_of_agent():
+    """ Prints the global dictionary of money_of_agent."""
+    # global money_of_agent
+    #print("money_of_agent:")
+     #for coord, value in money_of_agent.items():
+        #print(f"ID: {coord}, Value: {value}")
 
-grid = initialize_grid(15, 15, 0, density=0.5)
-print("Initial grid:")
-print(grid)
-print("\nmoney_of_agent:")
-print_money_of_agent()
+#grid = initialize_grid(15, 15, 0, density=0.5)
+#print("Initial grid:")
+#print(grid)
+#print("\nmoney_of_agent:")
+#print_money_of_agent()
 
+def transaction_rule(grid, delta_m, p_t, p_l):
+    """Apply transaction rules between agents."""
+    height, width = grid.shape
 
+    for _ in range(height * width):
+        x, y = np.random.randint(0, height), np.random.randint(0, width)
+        dx, dy = np.random.choice([-1, 0, 1]), np.random.choice([-1, 0, 1])
+        nx, ny = (x + dx) % height, (y + dy) % width
+
+        if dx == 0 and dy == 0:
+            continue
+
+        m_i, m_j = grid[x, y], grid[nx, ny]
+
+        if m_i + m_j == 0:
+            continue
+
+        R = np.random.random()
+
+        if m_i == 0 and R < p_t / 2:
+            grid[x, y] += delta_m
+            grid[nx, ny] -= delta_m
+        elif m_j == 0 and R < p_t / 2:
+            grid[x, y] -= delta_m
+            grid[nx, ny] += delta_m
+        elif m_i > m_j:
+            if R < p_t / 2 + p_l:
+                grid[x, y] += delta_m
+                grid[nx, ny] -= delta_m
+            elif R < p_t:
+                grid[x, y] -= delta_m
+                grid[nx, ny] += delta_m
+        elif m_i <= m_j:
+            if R < p_t / 2 - p_l:
+                grid[x, y] += delta_m
+                grid[nx, ny] -= delta_m
+            elif R < p_t:
+                grid[x, y] -= delta_m
+                grid[nx, ny] += delta_m
+
+    return grid
+
+def tax(grid, psi_max, omega, delta_m):
+    """Apply tax rules."""
+    m_max = np.max(grid)
+    psi_i = ((grid / m_max) ** omega) * psi_max
+    tax_liabilities = psi_i * delta_m
+
+    grid -= tax_liabilities
+    total_tax_revenue = np.sum(tax_liabilities)
+
+    redistribution = total_tax_revenue / grid.size
+    grid += redistribution
+
+    return grid
+
+def charity(grid, mr, mp, mc, pc):
+    """Apply charity rules."""
+    rich_agents = np.where(grid > mr)
+    total_charity = 0
+
+    for x, y in zip(rich_agents[0], rich_agents[1]):
+        if np.random.random() < pc:
+            donation = min(mc, grid[x, y])
+            grid[x, y] -= donation
+            total_charity += donation
+
+    poor_agents = np.where(grid < mp)
+    if len(poor_agents[0]) > 0:
+        redistribution = total_charity / len(poor_agents[0])
+        for x, y in zip(poor_agents[0], poor_agents[1]):
+            grid[x, y] += redistribution
+
+    return grid
 
 def move(m, n, height, width):
     """Move the persons randomly."""
@@ -68,80 +139,6 @@ def move(m, n, height, width):
     
     return m_new, n_new
 
-def transaction_rule(grid, delta_m, p_t, p_l):
-    """Apply transaction rules between the agents."""
-    for _ in range(height * width):
-        x, y = np.random.randint(0, height), np.random.randint(0, width)
-        dx, dy = np.random.choice([-1, 0, 1]), np.random.choice([-1, 0, 1])
-        nx, ny = (x + dx) % height, (y + dy) % width
-        if dx == 0 and dy == 0:
-            continue
-
-        m_i, m_j = grid[x, y], grid[nx, ny]
-
-        if m_i + m_j ==0:
-            continue
-
-        R = np.random.random()
-
-        if m_i == 0:
-            if R < p_t / 2:
-                grid[x, y] += delta_m
-                grid[nx, ny] -= delta_m
-
-        elif m_j == 0:
-            if R < p_t / 2:
-                grid[x, y] -= delta_m
-                grid[nx, ny] += delta_m
-
-        elif m_i > m_j:
-            if R < p_t / 2 + p_l:
-                grid[x, y] += delta_m
-                grid[nx, ny] -= delta_m
-            elif R < p_t:
-                grid[x, y] -= delta_m
-                grid[nx, ny] += delta_m
-
-        elif m_i <= m_j:
-            if R < p_t / 2 - p_l:
-                grid[x, y] += delta_m
-                grid[nx, ny] -= delta_m
-            elif R < p_t:
-                grid[x, y] -= delta_m
-                grid[nx, ny] += delta_m
-
-    return grid
-
-def tax(grid, psi_max, omega, delta_m):
-    """Apply tax rule."""
-    m_max = np.max(grid)
-    psi_i = ((grid / m_max) ** omega) * psi_max
-    tax_liabilities = psi_i * delta_m
-    grid -= tax_liabilities
-    total_tax_revenue = np.sum(tax_liabilities)
-    num_agents = grid.size
-    redistribution = total_tax_revenue / num_agents
-    grid += redistribution
-    return grid
-
-def charity(grid, mr, mp, mc, pc):
-    """Apply charity rule."""
-    rich_agents = np.where(grid > mr)
-    total_charity = 0
-    for x, y in zip(rich_agents[0], rich_agents[1]):
-        if np.random.random() < pc:
-            donation = min(mc, grid[x, y])
-            grid[x, y] -= donation
-            total_charity += donation
-
-    poor_agents = np.where(grid < mp)
-    num_poor_agents = len(poor_agents[0])
-    if num_poor_agents > 0:
-        redistribution = total_charity / num_poor_agents
-        for x, y in zip(poor_agents[0], poor_agents[1]):
-            grid[x, y] += redistribution
-
-    return grid
 
 def time_step_randwalk(grid, probablility_move,showmovements):
     """Perform a time step where the values move randomly without merging."""
@@ -247,7 +244,13 @@ def animate_CA(initial_grid, steps,showmovements, interval, probablility_move,):
         nonlocal grid
 
         #perform a time-step
-        grid = time_step_randwalk(grid, probablility_move,showmovements)  
+        grid = time_step_randwalk(grid, probablility_move, showmovements)  
+
+        # Apply transaction, tax, and charity rules
+        grid = transaction_rule(grid, delta_m, p_t, p_l)
+        grid = tax(grid, psi_max, omega, delta_m)
+        grid = charity(grid, mr, mp, mc, pc)
+        
         matrix.set_array(grid)
         # update text for each cell
         for i in range(grid.shape[0]):
@@ -272,8 +275,6 @@ def animate_CA(initial_grid, steps,showmovements, interval, probablility_move,):
 
 
 
-
-
 if __name__ == '__main__':
     """input parameters"""
     height = 15
@@ -282,12 +283,23 @@ if __name__ == '__main__':
     steps = 100  # timesteps
     density = 0.5
     showmovements = False
-
+# parameters
+    delta_m = 1.0
+    p_t = 1.0
+    p_l = 1.0
+    psi_max = 1.0
+    omega = 1.0
+    mr = 1.0
+    mp = 1.0
+    mc = 1.0
+    pc = 1.0
+    
     """set up grid"""
     grid = initialize_grid(height, width, 0, density)  # init. the grid
 
     """start animation, any data of interest can be returned from animate_CA"""
-    averages = animate_CA(grid, steps,showmovements, interval=100, probablility_move=probablility_move)
+    averages = animate_CA(grid, steps,showmovements, interval=100, probablility_move=probablility_move, 
+                          delta_m=delta_m, p_t=p_t, p_l=p_l, psi_max=psi_max, omega=omega, mr=mr, mp=mp, mc=mc, pc=pc)
 
 
 
