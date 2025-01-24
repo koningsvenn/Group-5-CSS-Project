@@ -11,7 +11,7 @@ import pandas as pd
 money_of_agent = {}
 
 """set up the grid"""
-def initialize_grid(height, width, fall_heigth, density):
+def initialize_grid(height, width, fall_heigth, density,m0):
     """Create a height x width grid with zeros representing empty cells or integers 
     to represent person size"""
 
@@ -31,107 +31,12 @@ def initialize_grid(height, width, fall_heigth, density):
             grid[m, n] = 1 
             # add agent info
             location = [m, n]
-            money = 2
+            money = m0
             money_of_agent[agents] = [location, money]
             # money_of_agent[(m, n)] = 2
         agents += 1
     print(money_of_agent)
     return grid 
-
-
-
-#--------------------------- NOT USED FUNCTIONS ATM ---------------------------
-def transaction_rule(grid, delta_m, p_t, p_l):
-    """Apply transaction rules between agents."""
-    height, width = grid.shape
-
-    for _ in range(height * width):
-        x, y = np.random.randint(0, height), np.random.randint(0, width)
-        dx, dy = np.random.choice([-1, 0, 1]), np.random.choice([-1, 0, 1])
-        nx, ny = (x + dx) % height, (y + dy) % width
-
-        if dx == 0 and dy == 0:
-            continue
-
-        m_i, m_j = grid[x, y], grid[nx, ny]
-
-        if m_i + m_j == 0:
-            continue
-
-        R = np.random.random()
-
-        if m_i == 0 and R < p_t / 2:
-            grid[x, y] += delta_m
-            grid[nx, ny] -= delta_m
-        elif m_j == 0 and R < p_t / 2:
-            grid[x, y] -= delta_m
-            grid[nx, ny] += delta_m
-        elif m_i > m_j:
-            if R < p_t / 2 + p_l:
-                grid[x, y] += delta_m
-                grid[nx, ny] -= delta_m
-            elif R < p_t:
-                grid[x, y] -= delta_m
-                grid[nx, ny] += delta_m
-        elif m_i <= m_j:
-            if R < p_t / 2 - p_l:
-                grid[x, y] += delta_m
-                grid[nx, ny] -= delta_m
-            elif R < p_t:
-                grid[x, y] -= delta_m
-                grid[nx, ny] += delta_m
-
-    return grid
-
-def tax(grid, psi_max, omega, delta_m):
-    """Apply tax rules."""
-    m_max = np.max(grid)
-    
-    # Handle the case where m_max is zero
-    if m_max == 0:
-        return grid  # No taxation if there is no wealth
-    
-    # Calculate tax liabilities
-    psi_i = ((grid / m_max) ** omega) * psi_max
-    tax_liabilities = psi_i * delta_m
-
-    # Avoid NaN or negative wealth
-    tax_liabilities = np.nan_to_num(tax_liabilities, nan=0.0, posinf=0.0, neginf=0.0)
-    grid -= tax_liabilities
-
-    total_tax_revenue = np.sum(tax_liabilities)
-
-    # Redistribute tax revenue equally
-    redistribution = total_tax_revenue / grid.size
-    grid += redistribution
-
-    # Ensure no NaN or negative values remain in the grid
-    grid = np.nan_to_num(grid, nan=0.0, posinf=0.0, neginf=0.0)
-    grid[grid < 0] = 0  # Prevent negative wealth
-
-    return grid
-
-def charity(grid, mr, mp, mc, pc):
-    """Apply charity rules."""
-    rich_agents = np.where(grid > mr)
-    total_charity = 0
-
-    for x, y in zip(rich_agents[0], rich_agents[1]):
-        if np.random.random() < pc:
-            donation = min(mc, grid[x, y])
-            grid[x, y] -= donation
-            total_charity += donation
-
-    poor_agents = np.where(grid < mp)
-    if len(poor_agents[0]) > 0:
-        redistribution = total_charity / len(poor_agents[0])
-        for x, y in zip(poor_agents[0], poor_agents[1]):
-            grid[x, y] += redistribution
-
-    return grid
-#--------------------------- NOT USED FUNCTIONS ATM ------------------------
-
-
 
 
 def move(m, n, height, width):
@@ -158,6 +63,7 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
     Returns:
         Updated money_of_agent dictionary.
     """
+
     height, width = grid.shape
     visited = set()
 
@@ -196,20 +102,57 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
                 if R < (p_t / 2 + p_i):  # agent Ai wins money
                     money_of_agent[agent_id][1] += delta_m
                     money_of_agent[neighbor_id][1] -= delta_m
-                elif R < p_t:  # agent Ai loses money
+                elif R < (p_t/2 -p_i):  # agent Ai loses money
                     money_of_agent[agent_id][1] -= delta_m
                     money_of_agent[neighbor_id][1] += delta_m
             elif neighbor_money > money > 0:  # case 4
                 if R < (p_t / 2 - p_i):  # agent Ai wins money
                     money_of_agent[agent_id][1] += delta_m
                     money_of_agent[neighbor_id][1] -= delta_m
-                elif R < p_t:  # agent Ai loses money
+                elif R < (p_t/2 + p_i):  # agent Ai loses money
                     money_of_agent[agent_id][1] -= delta_m
                     money_of_agent[neighbor_id][1] += delta_m
 
             # ensure money remains non-negative
             money_of_agent[agent_id][1] = max(0, money_of_agent[agent_id][1])
             money_of_agent[neighbor_id][1] = max(0, money_of_agent[neighbor_id][1])
+
+    return money_of_agent
+
+def tax(money_of_agent, delta_m, psi_max, omega, m_tax):
+    """
+    Apply income tax and redistribute the revenue equally among agents.
+
+    Args:
+        money_of_agent: Dictionary containing agent locations and money values.
+        delta_m: Fixed transaction unit of money.
+        psi_max: Maximum tax rate.
+        omega: Empirical parameter for tax rate calculation.
+        m_tax: Critical money threshold for taxation.
+
+    Returns:
+        Updated money_of_agent dictionary.
+    """
+    total_tax_revenue = 0  # initialize total tax revenue
+    m_max = max(agent[1] for agent in money_of_agent.values())  # find the max money among agents
+
+    # calculate tax liability and collect tax revenue
+    for agent_id, (location, money) in money_of_agent.items():
+        if money > m_tax:
+            psi_i = ((money / m_max) ** omega) * psi_max  # calculate average tax rate 
+            tax_liability = psi_i * delta_m  # calculate 
+            money_of_agent[agent_id][1] -= tax_liability  # deduct tax liability from the agent's money
+            total_tax_revenue += tax_liability  # add to total tax revenue
+
+    # redistribute tax revenue equally
+    redistribution = total_tax_revenue / len(money_of_agent)
+
+    for agent_id in money_of_agent:
+        money_of_agent[agent_id][1] += redistribution  # add redistributed amount to each agent's money
+
+    # ensure no agent has negative money
+    for agent_id in money_of_agent:
+        money_of_agent[agent_id][1] = max(0, money_of_agent[agent_id][1])
 
     return money_of_agent
 
@@ -265,7 +208,6 @@ def time_step_randwalk(grid, probablility_move,showmovements):
 
     return new_grid
 
-
 """Assign a color based on wealth"""
 def get_shades_of_green(n):
     """Generate n shades of green."""
@@ -274,7 +216,7 @@ def get_shades_of_green(n):
     return [(start + (end - start) * i / (n - 1)).tolist() for i in range(n)]
 
 """Animate the CA to visualize what is happening"""
-def animate_CA(initial_grid, steps,showmovements, interval, probablility_move, delta_m, p_t, p_l, psi_max, omega, mr, mp, mc, pc):
+def animate_CA(initial_grid, steps,showmovements, interval, probablility_move, delta_m, p_t, p_i, psi_max, omega, mr, mp, mc, pc,m_tax):
 
     """Animate the cellular automata, updating time step and cell values."""
     #set up colors and figure for the animation
@@ -304,7 +246,9 @@ def animate_CA(initial_grid, steps,showmovements, interval, probablility_move, d
 
         # Perform a time-step
         grid = time_step_randwalk(grid, probablility_move, showmovements)
-        money_of_agent = economic_transaction(grid, money_of_agent, delta_m, p_t, p_l)
+        money_of_agent = economic_transaction(grid, money_of_agent, delta_m, p_t, p_i)
+        money_of_agent = tax(money_of_agent, delta_m, psi_max, omega, m_tax)
+
         # print(money_of_agent)
 
         # update the grid display
@@ -334,28 +278,31 @@ def animate_CA(initial_grid, steps,showmovements, interval, probablility_move, d
 
 if __name__ == '__main__':
     """input parameters"""
-    height = 15
-    width = 15
-    probablility_move = 0.3  # chance of movement of indiviudual
-    steps = 100  # timesteps
+    height = 20
+    width = 20
+    probablility_move = 0.8  # chance of movement of indiviudual
+    steps = 200  # timesteps
     density = 0.2
     showmovements = False
-    delta_m = 1.0
-    p_t = 1.0
-    p_l = 1.0
-    psi_max = 1.0
-    omega = 1.0
+    m0 = 100
+    delta_m = m0/100
+    p_t = 0.7
+    p_i = 0.0574
     mr = 1.0
     mp = 1.0
     mc = 1.0
     pc = 1.0
+
+    m_tax = m0 / 2  # critical threshold for taxation
+    psi_max = 0.5   # maximum tax rate (adjustable)
+    omega = 1.0     # empirical parameter for tax calculation
     
     """set up grid"""
-    grid = initialize_grid(height, width, 0, density)  # init. the grid
+    grid = initialize_grid(height, width, 0, density,m0)  # init. the grid
 
     """start animation, any data of interest can be returned from animate_CA"""
     averages = animate_CA(grid, steps,showmovements, interval=100, probablility_move=probablility_move, 
-                          delta_m=delta_m, p_t=p_t, p_l=p_l, psi_max=psi_max, omega=omega, mr=mr, mp=mp, mc=mc, pc=pc)
+                          delta_m=delta_m, p_t=p_t, p_i=p_i, psi_max=psi_max, omega=omega, mr=mr, mp=mp, mc=mc, pc=pc,m_tax=m_tax)
 
 
 
