@@ -156,6 +156,43 @@ def tax(money_of_agent, delta_m, psi_max, omega, m_tax):
 
     return money_of_agent
 
+def charity(money_of_agent, m_r, m_p, m_c, charity_probability):
+    """
+    Collect charity donations and redistribute the revenue equally among agents.
+
+    Args:
+        money_of_agent: Dictionary containing agent locations and money values.
+        m_r: Amount of money needed to be considered rich.
+        m_p: Amount of money needed to be considered poor.
+        
+
+    Returns:
+        Updated money_of_agent dictionary.
+    """
+    total_charity_revenue = 0  # initialize total charity revenue
+    R = random.random()  # random probability
+     # Define poor agents (money < m_p) and rich agents (money > m_r)
+    poor_agents = [agent_id for agent_id, (location, money) in money_of_agent.items() if money < m_p]
+    rich_agents = [agent_id for agent_id, (location, money) in money_of_agent.items() if money > m_r]
+
+    # calculate charity contributions and collect charity revenue
+    if len(rich_agents) > 0 and len(poor_agents) > 0:
+        for agent_id in rich_agents:
+            if R < charity_probability:  # agent is rich and donates
+                money_of_agent[agent_id][1] -= m_c  # deduct charity contribution from the agent's money
+                total_charity_revenue += m_c  # add to total charity pool
+        
+        if total_charity_revenue > 0:
+            charity_redistribution = total_charity_revenue / len(poor_agents)
+            for agent_id in poor_agents:
+                money_of_agent[agent_id][1] += charity_redistribution
+
+    # ensure no agent has negative money
+    for agent_id in money_of_agent:
+        money_of_agent[agent_id][1] = max(0, money_of_agent[agent_id][1])
+
+    return money_of_agent
+
 def time_step_randwalk(grid, probablility_move,showmovements):
     """Perform a time step where the values move randomly without merging."""
     height, width = grid.shape
@@ -248,6 +285,7 @@ def animate_CA(initial_grid, steps,showmovements, interval, probablility_move, d
         grid = time_step_randwalk(grid, probablility_move, showmovements)
         money_of_agent = economic_transaction(grid, money_of_agent, delta_m, p_t, p_i)
         money_of_agent = tax(money_of_agent, delta_m, psi_max, omega, m_tax)
+        money_of_agent = charity(money_of_agent, mr, mp, mc, charity_probability)
 
         # print(money_of_agent)
 
@@ -296,7 +334,12 @@ if __name__ == '__main__':
     m_tax = m0 / 2  # critical threshold for taxation
     psi_max = 0.5   # maximum tax rate (adjustable)
     omega = 1.0     # empirical parameter for tax calculation
-    
+
+    m_p = 0.7 * m0 # poverty line (if agent has less than this level of income they are eligible to receive donations)
+    m_r = 1.5 * m0 # rich line (if agent has more than this level of income they are eligible to give donations)
+    m_c = delta_m * 0.5 # charity donation amount
+    charity_probability = 0.5  # probability of donating to charity
+
     """set up grid"""
     grid = initialize_grid(height, width, 0, density,m0)  # init. the grid
 
