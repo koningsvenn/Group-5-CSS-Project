@@ -164,7 +164,7 @@ def charity(money_of_agent, m_r, m_p, m_c, charity_probability):
         money_of_agent: Dictionary containing agent locations and money values.
         m_r: Amount of money needed to be considered rich.
         m_p: Amount of money needed to be considered poor.
-        
+        m_c: Fixed amount of charity contribution.
 
     Returns:
         Updated money_of_agent dictionary.
