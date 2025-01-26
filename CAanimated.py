@@ -303,47 +303,38 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
         total_agents_list = []
         
         def update(frames):
-            global money_of_agent  # access the global variable
+            global money_of_agent  # Access the global variable
             nonlocal grid
 
             # Perform a time-step
             grid = time_step_randwalk(grid, probablility_move, showmovements)
 
-            #transact and track interesting variables
-            money_of_agent,total_transaction,transaction_count = economic_transaction(grid, money_of_agent, delta_m, p_t, p_i)
+            # Transact and track interesting variables
+            money_of_agent, total_transaction, transaction_count = economic_transaction(grid, money_of_agent, delta_m, p_t, p_i)
             total_transactions_per_step.append(total_transaction)  
             total_transaction_counts.append(transaction_count)
 
             money_of_agent = tax(money_of_agent, delta_m, psi_max, omega, m_tax)
-
             money_of_agent = charity(money_of_agent, mr, mp, mc, charity_probability)
 
-            # print(money_of_agent)
-
-            # update the grid display
+            # Update the grid display
             matrix.set_array(grid)
 
-            # clear all text from the grid initially
+            # Clear all text from the grid initially
             for i in range(grid.shape[0]):
                 for j in range(grid.shape[1]):
-                    text[i][j].set_text('')  # clear previous text
+                    text[i][j].set_text('')  # Clear previous text
 
-        # display money values for agents
-        for agent_id, (location, money, win) in money_of_agent.items():
-            m, n = location  # agent's location in the grid
-            text[m][n].set_text(f'{int(money)}')  # display agent's money
-            text[m][n].set_color('white' if money > 2 else 'black')  # adjust text color for better contrast
-            # display money values for agents
-            for agent_id, (location, money) in money_of_agent.items():
-                m, n = location  # agent's location in the grid
-                text[m][n].set_text(f'{int(money)}')  # display agent's money
-                text[m][n].set_color('white' if money > 2 else 'black')  # adjust text color for better contrast
+            # Display money values for agents
+            for agent_id, (location, money, win) in money_of_agent.items():
+                m, n = location  # Agent's location in the grid
+                text[m][n].set_text(f'{int(money)}')  # Display agent's money
+                text[m][n].set_color('white' if money > 2 else 'black')  # Adjust text color for better contrast
 
-            # update title and return all drawable elements
+            # Update title and return all drawable elements
             ax.set_title(f"Economy Automata")
             return [matrix] + [txt for row in text for txt in row]
-
-
+       
         ani = FuncAnimation(fig, update, frames=steps-1, interval=interval, blit=False, repeat=False) #average step -1 because the first frame is a step 
         plt.show()
     else:
@@ -372,7 +363,7 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
             total_agents = len(money_of_agent)
             total_agents_list.append(total_agents)
 
-
+    print("returning")
     return averages,total_transactions_per_step,total_transaction_counts #,return any data of interest from this function
 
 
@@ -386,7 +377,7 @@ if __name__ == '__main__':
     density = 0.2
 
     showmovements = False
-    show_animation = False
+    show_animation = True
 
     m0 = 100
     delta_m = m0/100
