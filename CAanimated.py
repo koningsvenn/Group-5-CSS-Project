@@ -279,6 +279,7 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
     averages = []
     total_transactions_per_step = []  
     total_transaction_counts = []
+    global money_of_agent  # Access the global variable
 
     if show_animation:
         """Animate the cellular automata, updating time step and cell values."""
@@ -347,9 +348,8 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
         plt.show()
     else:
         """Run the cellular automata in the background, updating time step and cell values."""
-    
+
         grid = np.copy(initial_grid)
-        global money_of_agent  # Access the global variable
 
         # Lists to collect data
         total_agents_list = []
@@ -368,8 +368,7 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
             money_of_agent = charity(money_of_agent, mr, mp, mc, charity_probability)
 
             # Collect data at this step if needed
-            average_money = np.mean([money for _, (_, money) in money_of_agent.items()])
-            averages.append(average_money)
+            average_money = np.mean([money for _, (_, money, _) in money_of_agent.items()])  
             total_agents = len(money_of_agent)
             total_agents_list.append(total_agents)
 
