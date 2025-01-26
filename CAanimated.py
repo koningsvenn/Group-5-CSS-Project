@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
+from plot_utils import plot_transaction_distribution,plot_transaction_counts
 
 
 
@@ -65,6 +66,7 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
     """
     total_transaction = 0
     transaction_count = 0 
+    transaction_amounts = []  # Lijst om transactiebedragen op te slaan
 
     height, width = grid.shape
     visited = set()
@@ -103,6 +105,8 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
                     money_of_agent[agent_id][2] = True
                     total_transaction += delta_m
                     transaction_count += 1
+                    transaction_amounts.append(delta_m)
+                    
             elif money >= neighbor_money > 0:  # case 3
                 if R < (p_t / 2 + p_i):  # agent Ai wins money
                     money_of_agent[agent_id][1] += delta_m
@@ -110,12 +114,17 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
                     money_of_agent[agent_id][2] = True
                     total_transaction += delta_m
                     transaction_count += 1
+                    transaction_amounts.append(delta_m)
+                    
+
                 elif R < (p_t/2 -p_i):  # agent Ai loses money
                     money_of_agent[agent_id][1] -= delta_m
                     money_of_agent[neighbor_id][1] += delta_m
                     money_of_agent[neighbor_id][2] = True
                     total_transaction += delta_m
                     transaction_count += 1
+                    transaction_amounts.append(delta_m)
+                    
             elif neighbor_money > money > 0:  # case 4
                 if R < (p_t / 2 - p_i):  # agent Ai wins money
                     money_of_agent[agent_id][1] += delta_m
@@ -123,18 +132,22 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
                     money_of_agent[agent_id][2] = True
                     total_transaction += delta_m
                     transaction_count += 1
+                    transaction_amounts.append(delta_m)
+                    
                 elif R < (p_t/2 + p_i):  # agent Ai loses money
                     money_of_agent[agent_id][1] -= delta_m
                     money_of_agent[neighbor_id][1] += delta_m
                     money_of_agent[neighbor_id][2] = True
                     total_transaction += delta_m
                     transaction_count += 1
+                    transaction_amounts.append(delta_m)
+                    
 
             # ensure money remains non-negative
             money_of_agent[agent_id][1] = max(0, money_of_agent[agent_id][1])
             money_of_agent[neighbor_id][1] = max(0, money_of_agent[neighbor_id][1])
 
-    return money_of_agent,total_transaction,transaction_count
+    return money_of_agent,total_transaction,transaction_count,transaction_amounts
 
 def tax(money_of_agent, delta_m, psi_max, omega, m_tax):
     """
@@ -215,6 +228,7 @@ def charity(money_of_agent, m_r, m_p, m_c, charity_probability):
 
     return money_of_agent
 
+
 def time_step_randwalk(grid, probablility_move,showmovements):
     """Perform a time step where the values move randomly without merging."""
     height, width = grid.shape
@@ -279,7 +293,9 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
     averages = []
     total_transactions_per_step = []  
     total_transaction_counts = []
-    global money_of_agent  # Access the global variable
+    all_transaction_amounts = []  
+
+    global money_of_agent  
 
     if show_animation:
         """Animate the cellular automata, updating time step and cell values."""
@@ -310,10 +326,12 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
             grid = time_step_randwalk(grid, probablility_move, showmovements)
 
             # Transact and track interesting variables
-            money_of_agent, total_transaction, transaction_count = economic_transaction(grid, money_of_agent, delta_m, p_t, p_i)
+            money_of_agent, total_transaction, transaction_count,transaction_amounts = economic_transaction(grid, money_of_agent, delta_m, p_t, p_i)
             total_transactions_per_step.append(total_transaction)  
             total_transaction_counts.append(transaction_count)
-
+            all_transaction_amounts.extend(transaction_amounts)
+            
+            
             money_of_agent = tax(money_of_agent, delta_m, psi_max, omega, m_tax)
             money_of_agent = charity(money_of_agent, mr, mp, mc, charity_probability)
 
@@ -351,9 +369,10 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
             grid = time_step_randwalk(grid, probablility_move, showmovements=False)
 
             #eceonomic transaction and track interesting variables
-            money_of_agent,total_transaction,transaction_count = economic_transaction(grid, money_of_agent, delta_m, p_t, p_i)
+            money_of_agent,total_transaction,transaction_count,transaction_amounts = economic_transaction(grid, money_of_agent, delta_m, p_t, p_i)
             total_transactions_per_step.append(total_transaction)  
             total_transaction_counts.append(transaction_count)
+            all_transaction_amounts.extend(transaction_amounts)
 
             money_of_agent = tax(money_of_agent, delta_m, psi_max, omega, m_tax)
             money_of_agent = charity(money_of_agent, mr, mp, mc, charity_probability)
@@ -363,8 +382,7 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
             total_agents = len(money_of_agent)
             total_agents_list.append(total_agents)
 
-    print("returning")
-    return averages,total_transactions_per_step,total_transaction_counts #,return any data of interest from this function
+    return averages,total_transactions_per_step,total_transaction_counts,all_transaction_amounts #,return any data of interest from this function
 
 
 
@@ -377,7 +395,7 @@ if __name__ == '__main__':
     density = 0.2
 
     showmovements = False
-    show_animation = True
+    show_animation = False
 
     m0 = 100
     delta_m = m0/100
@@ -401,13 +419,13 @@ if __name__ == '__main__':
     grid = initialize_grid(height, width, 0, density,m0)  # init. the grid
 
     """start animation, any data of interest can be returned from animate_CA"""
-    averages,total_money_transacted_per_timestep,total_transaction_counts = animate_CA(grid, steps,showmovements,show_animation, interval=100, probablility_move=probablility_move, 
+    averages,total_money_transacted_per_timestep,total_transaction_counts,all_transaction_amounts = animate_CA(grid, steps,showmovements,show_animation, interval=100, probablility_move=probablility_move, 
                           delta_m=delta_m, p_t=p_t, p_i=p_i, psi_max=psi_max, omega=omega, mr=mr, mp=mp, mc=mc, pc=pc,m_tax=m_tax)
 
-    
-    
-    print(total_transaction_counts)
-    print(total_money_transacted_per_timestep)
+    # plot distribution of total money transacted each timestep
+    plot_transaction_distribution(total_money_transacted_per_timestep)
+    plot_transaction_counts(total_transaction_counts)
+
 
 
 

@@ -12,6 +12,14 @@ This Python script simulates a Cellular Automata (CA) environment where agents i
   - **Transaction count per timestep**.
 - Option to display movements and animation.
 
+## Folders
+- ./results contains the plots made from gathered data
+
+## Files
+- CAanimated.py => main file that runs the simulations and gathers data
+- plot_utils.py => file that contains the functions to plot the gathered data from
+CAanimated.py and saves them
+
 ## Parameters
 The simulation behavior can be customized using the following parameters in the initialization section (`__main__` block):
 - **Grid Dimensions**:
