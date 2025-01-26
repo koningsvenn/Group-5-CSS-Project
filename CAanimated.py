@@ -53,7 +53,7 @@ def move(m, n, height, width):
 
 def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
     """
-    Perform economic transactions between neighboring agents.
+    Perform economic transactions between neighboring agents. Also checks total amount of transacted money per timestep.
     Args:
         grid: The grid representing agent positions.
         money_of_agent: A dictionary mapping agent IDs to their location and money.
@@ -63,6 +63,8 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
     Returns:
         Updated money_of_agent dictionary.
     """
+    total_transaction = 0
+    transaction_count = 0 
 
     height, width = grid.shape
     visited = set()
@@ -98,26 +100,36 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
                 if R < p_t:  # agent Ai wins money
                     money_of_agent[agent_id][1] += delta_m
                     money_of_agent[neighbor_id][1] -= delta_m
+                    total_transaction += delta_m
+                    transaction_count += 1
             elif money >= neighbor_money > 0:  # case 3
                 if R < (p_t / 2 + p_i):  # agent Ai wins money
                     money_of_agent[agent_id][1] += delta_m
                     money_of_agent[neighbor_id][1] -= delta_m
+                    total_transaction += delta_m
+                    transaction_count += 1
                 elif R < (p_t/2 -p_i):  # agent Ai loses money
                     money_of_agent[agent_id][1] -= delta_m
                     money_of_agent[neighbor_id][1] += delta_m
+                    total_transaction += delta_m
+                    transaction_count += 1
             elif neighbor_money > money > 0:  # case 4
                 if R < (p_t / 2 - p_i):  # agent Ai wins money
                     money_of_agent[agent_id][1] += delta_m
                     money_of_agent[neighbor_id][1] -= delta_m
+                    total_transaction += delta_m
+                    transaction_count += 1
                 elif R < (p_t/2 + p_i):  # agent Ai loses money
                     money_of_agent[agent_id][1] -= delta_m
                     money_of_agent[neighbor_id][1] += delta_m
+                    total_transaction += delta_m
+                    transaction_count += 1
 
             # ensure money remains non-negative
             money_of_agent[agent_id][1] = max(0, money_of_agent[agent_id][1])
             money_of_agent[neighbor_id][1] = max(0, money_of_agent[neighbor_id][1])
 
-    return money_of_agent
+    return money_of_agent,total_transaction,transaction_count
 
 def tax(money_of_agent, delta_m, psi_max, omega, m_tax):
     """
@@ -253,64 +265,101 @@ def get_shades_of_green(n):
     return [(start + (end - start) * i / (n - 1)).tolist() for i in range(n)]
 
 """Animate the CA to visualize what is happening"""
-def animate_CA(initial_grid, steps,showmovements, interval, probablility_move, delta_m, p_t, p_i, psi_max, omega, mr, mp, mc, pc,m_tax):
-
-    """Animate the cellular automata, updating time step and cell values."""
-    #set up colors and figure for the animation
-    colors = get_shades_of_green(20) 
-    cmap = LinearSegmentedColormap.from_list("custom_blue", colors, N=256)
-    fig, ax = plt.subplots(figsize=(6, 5))
-    ax.set_xticks(np.arange(-.5, initial_grid.shape[1], 1), minor=True)
-    ax.set_yticks(np.arange(-.5, initial_grid.shape[0], 1), minor=True)
-    ax.grid(which="minor", color="w", linestyle='-', linewidth=2)
-    ax.set_xticks([])
-    ax.set_yticks([])
-
-    grid = np.copy(initial_grid)
-    matrix = ax.matshow(grid, cmap=cmap)
-
-    # create text objects for each cell
-    text = [[ax.text(j, i, '', ha='center', va='center', color='black') for j in range(grid.shape[1])] for i in range(grid.shape[0])]
-
-    #lists to collect data
+def animate_CA(initial_grid, steps,showmovements,show_animation, interval, probablility_move, delta_m, p_t, p_i, psi_max, omega, mr, mp, mc, pc,m_tax):
     averages = []
-    raind_count_list = []
-    total_agents_list = []
+    total_transactions_per_step = []  
+    total_transaction_counts = []
+
+    if show_animation:
+        """Animate the cellular automata, updating time step and cell values."""
+        #set up colors and figure for the animation
+        colors = get_shades_of_green(20) 
+        cmap = LinearSegmentedColormap.from_list("custom_blue", colors, N=256)
+        fig, ax = plt.subplots(figsize=(6, 5))
+        ax.set_xticks(np.arange(-.5, initial_grid.shape[1], 1), minor=True)
+        ax.set_yticks(np.arange(-.5, initial_grid.shape[0], 1), minor=True)
+        ax.grid(which="minor", color="w", linestyle='-', linewidth=2)
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+        grid = np.copy(initial_grid)
+        matrix = ax.matshow(grid, cmap=cmap)
+
+        # create text objects for each cell
+        text = [[ax.text(j, i, '', ha='center', va='center', color='black') for j in range(grid.shape[1])] for i in range(grid.shape[0])]
+
+        #lists to collect data
+        total_agents_list = []
+        
+        def update(frames):
+            global money_of_agent  # access the global variable
+            nonlocal grid
+
+            # Perform a time-step
+            grid = time_step_randwalk(grid, probablility_move, showmovements)
+
+            #transact and track interesting variables
+            money_of_agent,total_transaction,transaction_count = economic_transaction(grid, money_of_agent, delta_m, p_t, p_i)
+            total_transactions_per_step.append(total_transaction)  
+            total_transaction_counts.append(transaction_count)
+
+            money_of_agent = tax(money_of_agent, delta_m, psi_max, omega, m_tax)
+
+            money_of_agent = charity(money_of_agent, mr, mp, mc, charity_probability)
+
+            # print(money_of_agent)
+
+            # update the grid display
+            matrix.set_array(grid)
+
+            # clear all text from the grid initially
+            for i in range(grid.shape[0]):
+                for j in range(grid.shape[1]):
+                    text[i][j].set_text('')  # clear previous text
+
+            # display money values for agents
+            for agent_id, (location, money) in money_of_agent.items():
+                m, n = location  # agent's location in the grid
+                text[m][n].set_text(f'{int(money)}')  # display agent's money
+                text[m][n].set_color('white' if money > 2 else 'black')  # adjust text color for better contrast
+
+            # update title and return all drawable elements
+            ax.set_title(f"Economy Automata")
+            return [matrix] + [txt for row in text for txt in row]
+
+
+        ani = FuncAnimation(fig, update, frames=steps-1, interval=interval, blit=False, repeat=False) #average step -1 because the first frame is a step 
+        plt.show()
+    else:
+        """Run the cellular automata in the background, updating time step and cell values."""
     
-    def update(frames):
-        global money_of_agent  # access the global variable
-        nonlocal grid
+        grid = np.copy(initial_grid)
+        global money_of_agent  # Access the global variable
 
-        # Perform a time-step
-        grid = time_step_randwalk(grid, probablility_move, showmovements)
-        money_of_agent = economic_transaction(grid, money_of_agent, delta_m, p_t, p_i)
-        money_of_agent = tax(money_of_agent, delta_m, psi_max, omega, m_tax)
-        money_of_agent = charity(money_of_agent, mr, mp, mc, charity_probability)
+        # Lists to collect data
+        total_agents_list = []
 
-        # print(money_of_agent)
+        # Run the simulation for the specified steps
+        for step in range(steps):
+            # Perform a time-step
+            grid = time_step_randwalk(grid, probablility_move, showmovements=False)
 
-        # update the grid display
-        matrix.set_array(grid)
+            #eceonomic transaction and track interesting variables
+            money_of_agent,total_transaction,transaction_count = economic_transaction(grid, money_of_agent, delta_m, p_t, p_i)
+            total_transactions_per_step.append(total_transaction)  
+            total_transaction_counts.append(transaction_count)
 
-        # clear all text from the grid initially
-        for i in range(grid.shape[0]):
-            for j in range(grid.shape[1]):
-                text[i][j].set_text('')  # clear previous text
+            money_of_agent = tax(money_of_agent, delta_m, psi_max, omega, m_tax)
+            money_of_agent = charity(money_of_agent, mr, mp, mc, charity_probability)
 
-        # display money values for agents
-        for agent_id, (location, money) in money_of_agent.items():
-            m, n = location  # agent's location in the grid
-            text[m][n].set_text(f'{int(money)}')  # display agent's money
-            text[m][n].set_color('white' if money > 2 else 'black')  # adjust text color for better contrast
-
-        # update title and return all drawable elements
-        ax.set_title(f"Economy Automata")
-        return [matrix] + [txt for row in text for txt in row]
+            # Collect data at this step if needed
+            average_money = np.mean([money for _, (_, money) in money_of_agent.items()])
+            averages.append(average_money)
+            total_agents = len(money_of_agent)
+            total_agents_list.append(total_agents)
 
 
-    ani = FuncAnimation(fig, update, frames=steps-1, interval=interval, blit=False, repeat=False) #average step -1 because the first frame is a step 
-    plt.show()
-    return averages #,return any data of interest from this function
+    return averages,total_transactions_per_step,total_transaction_counts #,return any data of interest from this function
 
 
 
@@ -321,7 +370,10 @@ if __name__ == '__main__':
     probablility_move = 0.8  # chance of movement of indiviudual
     steps = 200  # timesteps
     density = 0.2
+
     showmovements = False
+    show_animation = False
+
     m0 = 100
     delta_m = m0/100
     p_t = 0.7
@@ -344,9 +396,12 @@ if __name__ == '__main__':
     grid = initialize_grid(height, width, 0, density,m0)  # init. the grid
 
     """start animation, any data of interest can be returned from animate_CA"""
-    averages = animate_CA(grid, steps,showmovements, interval=100, probablility_move=probablility_move, 
+    averages,total_money_transacted_per_timestep,total_transaction_counts = animate_CA(grid, steps,showmovements,show_animation, interval=100, probablility_move=probablility_move, 
                           delta_m=delta_m, p_t=p_t, p_i=p_i, psi_max=psi_max, omega=omega, mr=mr, mp=mp, mc=mc, pc=pc,m_tax=m_tax)
-
+    
+    
+    print(total_transaction_counts)
+    print(total_money_transacted_per_timestep)
 
 
 
