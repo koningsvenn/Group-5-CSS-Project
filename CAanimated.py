@@ -11,7 +11,7 @@ import pandas as pd
 money_of_agent = {}
 
 """set up the grid"""
-def initialize_grid(height, width, fall_heigth, density,m0):
+def initialize_grid(height, width, fall_heigth, density, m0):
     """Create a height x width grid with zeros representing empty cells or integers 
     to represent person size"""
 
@@ -32,7 +32,7 @@ def initialize_grid(height, width, fall_heigth, density,m0):
             # add agent info
             location = [m, n]
             money = m0
-            money_of_agent[agents] = [location, money]
+            money_of_agent[agents] = [location, money, False]
             # money_of_agent[(m, n)] = 2
         agents += 1
     print(money_of_agent)
@@ -70,7 +70,7 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
     visited = set()
 
     # iterate over all agents
-    for agent_id, (location, money) in money_of_agent.items():
+    for agent_id, (location, money, win) in money_of_agent.items():
         m, n = location
         neighbors = []
 
@@ -81,7 +81,7 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
                     continue
                 m_new, n_new = (m + i) % height, (n + j) % width
                 if grid[m_new, n_new] == 1:  # check if a neighbor is present
-                    for neighbor_id, (neighbor_loc, neighbor_money) in money_of_agent.items():
+                    for neighbor_id, (neighbor_loc, neighbor_money, win) in money_of_agent.items():
                         if neighbor_loc == [m_new, n_new]:
                             neighbors.append((neighbor_id, neighbor_loc, neighbor_money))
                             break
@@ -100,28 +100,33 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
                 if R < p_t:  # agent Ai wins money
                     money_of_agent[agent_id][1] += delta_m
                     money_of_agent[neighbor_id][1] -= delta_m
+                    money_of_agent[agent_id][2] = True
                     total_transaction += delta_m
                     transaction_count += 1
             elif money >= neighbor_money > 0:  # case 3
                 if R < (p_t / 2 + p_i):  # agent Ai wins money
                     money_of_agent[agent_id][1] += delta_m
                     money_of_agent[neighbor_id][1] -= delta_m
+                    money_of_agent[agent_id][2] = True
                     total_transaction += delta_m
                     transaction_count += 1
                 elif R < (p_t/2 -p_i):  # agent Ai loses money
                     money_of_agent[agent_id][1] -= delta_m
                     money_of_agent[neighbor_id][1] += delta_m
+                    money_of_agent[neighbor_id][2] = True
                     total_transaction += delta_m
                     transaction_count += 1
             elif neighbor_money > money > 0:  # case 4
                 if R < (p_t / 2 - p_i):  # agent Ai wins money
                     money_of_agent[agent_id][1] += delta_m
                     money_of_agent[neighbor_id][1] -= delta_m
+                    money_of_agent[agent_id][2] = True
                     total_transaction += delta_m
                     transaction_count += 1
                 elif R < (p_t/2 + p_i):  # agent Ai loses money
                     money_of_agent[agent_id][1] -= delta_m
                     money_of_agent[neighbor_id][1] += delta_m
+                    money_of_agent[neighbor_id][2] = True
                     total_transaction += delta_m
                     transaction_count += 1
 
@@ -148,13 +153,18 @@ def tax(money_of_agent, delta_m, psi_max, omega, m_tax):
     total_tax_revenue = 0  # initialize total tax revenue
     m_max = max(agent[1] for agent in money_of_agent.values())  # find the max money among agents
 
+    winner_agents = [agent_id for agent_id, (location, money, win) in money_of_agent.items() if win == True]
     # calculate tax liability and collect tax revenue
-    for agent_id, (location, money) in money_of_agent.items():
+    for agent_id in winner_agents:
+        money = money_of_agent[agent_id][1]
+        #update win to false
+        money_of_agent[agent_id][2] = False
         if money > m_tax:
             psi_i = ((money / m_max) ** omega) * psi_max  # calculate average tax rate 
             tax_liability = psi_i * delta_m  # calculate 
             money_of_agent[agent_id][1] -= tax_liability  # deduct tax liability from the agent's money
             total_tax_revenue += tax_liability  # add to total tax revenue
+
 
     # redistribute tax revenue equally
     redistribution = total_tax_revenue / len(money_of_agent)
@@ -184,8 +194,8 @@ def charity(money_of_agent, m_r, m_p, m_c, charity_probability):
     total_charity_revenue = 0  # initialize total charity revenue
     R = random.random()  # random probability
      # Define poor agents (money < m_p) and rich agents (money > m_r)
-    poor_agents = [agent_id for agent_id, (location, money) in money_of_agent.items() if money < m_p]
-    rich_agents = [agent_id for agent_id, (location, money) in money_of_agent.items() if money > m_r]
+    poor_agents = [agent_id for agent_id, (location, money, win) in money_of_agent.items() if money < m_p]
+    rich_agents = [agent_id for agent_id, (location, money, win) in money_of_agent.items() if money > m_r]
 
     # calculate charity contributions and collect charity revenue
     if len(rich_agents) > 0 and len(poor_agents) > 0:
@@ -317,6 +327,11 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
                 for j in range(grid.shape[1]):
                     text[i][j].set_text('')  # clear previous text
 
+        # display money values for agents
+        for agent_id, (location, money, win) in money_of_agent.items():
+            m, n = location  # agent's location in the grid
+            text[m][n].set_text(f'{int(money)}')  # display agent's money
+            text[m][n].set_color('white' if money > 2 else 'black')  # adjust text color for better contrast
             # display money values for agents
             for agent_id, (location, money) in money_of_agent.items():
                 m, n = location  # agent's location in the grid
@@ -398,6 +413,7 @@ if __name__ == '__main__':
     """start animation, any data of interest can be returned from animate_CA"""
     averages,total_money_transacted_per_timestep,total_transaction_counts = animate_CA(grid, steps,showmovements,show_animation, interval=100, probablility_move=probablility_move, 
                           delta_m=delta_m, p_t=p_t, p_i=p_i, psi_max=psi_max, omega=omega, mr=mr, mp=mp, mc=mc, pc=pc,m_tax=m_tax)
+
     
     
     print(total_transaction_counts)
