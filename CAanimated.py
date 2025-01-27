@@ -71,6 +71,9 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
     height, width = grid.shape
     visited = set()
 
+    # calculate total money before transactions
+    total_money_before = sum(agent[1] for agent in money_of_agent.values())
+
     # iterate over all agents
     for agent_id, (location, money, win) in money_of_agent.items():
         m, n = location
@@ -147,6 +150,13 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
             money_of_agent[agent_id][1] = max(0, money_of_agent[agent_id][1])
             money_of_agent[neighbor_id][1] = max(0, money_of_agent[neighbor_id][1])
 
+    # calculate total money after transactions
+    total_money_after = sum(agent[1] for agent in money_of_agent.values())
+
+    # check if total money is conserved
+    assert round(total_money_before, 0) == round(total_money_after, 0), \
+    f"Total money before ({total_money_before:.2f}) and after ({total_money_after:.2f}) transactions does not match!"
+
     return money_of_agent,total_transaction,transaction_count,transaction_amounts
 
 def tax(money_of_agent, delta_m, psi_max, omega, m_tax):
@@ -189,6 +199,11 @@ def tax(money_of_agent, delta_m, psi_max, omega, m_tax):
     for agent_id in money_of_agent:
         money_of_agent[agent_id][1] = max(0, money_of_agent[agent_id][1])
 
+    # check if total tax revenue matches total distributed amount
+    total_distributed = redistribution * len(money_of_agent)
+    assert round(total_tax_revenue, 5) == round(total_distributed, 5), \
+        f"Total tax collected ({total_tax_revenue:.5f}) does not match total distributed ({total_distributed:.5f})!"
+
     return money_of_agent
 
 def charity(money_of_agent, m_r, m_p, m_c, charity_probability):
@@ -225,6 +240,11 @@ def charity(money_of_agent, m_r, m_p, m_c, charity_probability):
     # ensure no agent has negative money
     for agent_id in money_of_agent:
         money_of_agent[agent_id][1] = max(0, money_of_agent[agent_id][1])
+
+    # check if total charity revenue matches total redistributed amount
+    total_redistributed = total_charity_revenue if len(poor_agents) > 0 else 0
+    assert round(total_charity_revenue, 5) == round(total_redistributed, 5), \
+            f"Total charity collected ({total_charity_revenue:.5f}) does not match total redistributed ({total_redistributed:.5f})!"
 
     return money_of_agent
 
