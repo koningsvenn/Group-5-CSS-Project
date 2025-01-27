@@ -394,6 +394,7 @@ if __name__ == '__main__':
     steps = 200  # timesteps
     density = 0.2
 
+    # animation and logging
     showmovements = False
     show_animation = False
 
