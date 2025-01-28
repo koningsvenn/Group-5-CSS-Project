@@ -462,7 +462,7 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
 
     # append param_list to the beginning of the file
     with open(filepath, 'a') as file:
-        file.write("\n" + param_list + "\n")
+        file.write("\n" + param_list)
 
     return averages,total_transactions_per_step,total_transaction_counts,all_transaction_amounts #,return any data of interest from this function
 
