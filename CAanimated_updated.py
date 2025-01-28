@@ -43,7 +43,7 @@ def initialize_grid(height, width, density, m0):
             money_of_agent[agents] = [location, money, False, transactions, tax_amt_paid, tax_amt_received, charity_amt, poor, rich]
             # money_of_agent[(m, n)] = 2
         agents += 1
-    print(money_of_agent)
+    # print(money_of_agent)
     return grid 
 
 
@@ -67,7 +67,7 @@ def record_transaction_data(timestep):
             "Amount of income gained/lost": sum(transactions),
             "Amount of tax paid": tax_amt_paid,
             "Amount of tax received": tax_amt_received,
-            "Amount of charity given": charity_amt if charity_amt < 0 else 0,
+            "Amount of charity given": -1*charity_amt if charity_amt < 0 else 0,
             "Amount of charity received": charity_amt if charity_amt > 0 else 0
         })
 
@@ -274,7 +274,7 @@ def charity(money_of_agent, m_r, m_p, m_c, charity_probability):
             money_of_agent[agent_id][8] = True
             if R < charity_probability:  # agent is rich and donates
                 money_of_agent[agent_id][1] -= m_c  # deduct charity contribution from the agent's money
-                money_of_agent[agent_id][6] += m_c  # log charity amount
+                money_of_agent[agent_id][6] -= m_c  # log charity amount
                 total_charity_revenue += m_c  # add to total charity pool
         
         if total_charity_revenue > 0:
@@ -498,7 +498,7 @@ if __name__ == '__main__':
     m_c = delta_m * 0.5 # charity donation amount
     charity_probability = 0.5  # probability of donating to charity
 
-    run_num = 1 # run number for saving data
+    run_num = 7 # run number for saving data
     param_list = f"m0: {m0}; delta_m: {delta_m}; p_t: {p_t}; p_i: {p_i}; mr: {mr}; mp: {mp}; mc: {mc}; pc: {pc}; m_tax: {m_tax}; psi_max: {psi_max}; omega: {omega}; m_p: {m_p}; m_r:{m_r}; m_c:{m_c}; charity_probability: {charity_probability}"
 
     # set up + initialize the grid
