@@ -274,7 +274,7 @@ def charity(money_of_agent, m_r, m_p, m_c, charity_probability):
             money_of_agent[agent_id][8] = True
             if R < charity_probability:  # agent is rich and donates
                 money_of_agent[agent_id][1] -= m_c  # deduct charity contribution from the agent's money
-                money_of_agent[agent_id][6] += m_c  # log charity amount
+                money_of_agent[agent_id][6] -= m_c  # log charity amount
                 total_charity_revenue += m_c  # add to total charity pool
         
         if total_charity_revenue > 0:
