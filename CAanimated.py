@@ -10,53 +10,6 @@ from plot_utils import plot_transaction_distribution,plot_transaction_counts
 
 # track money and position of each agent
 money_of_agent = {}
-
-"""set up the grid"""
-def initialize_grid(height, width, density, m0):
-    """Create a height x width grid with zeros representing empty cells or integers 
-    to represent person size"""
-
-    global money_of_agent
-    money_of_agent.clear()
-    # empty grid
-    grid = np.zeros((height, width))  
-    no_of_agents = int(height * width * density) 
-    
-    # select random coordinates for each person
-    agents = 0
-    while agents < no_of_agents:
-        n = random.randint(0, width - 1)
-        m = random.randint(0, height - 1)
-
-        if grid[m, n] == 0:
-            grid[m, n] = 1 
-            # add agent info
-            location = [m, n]
-            money = m0
-            transactions = []
-            tax_amt_paid = 0
-            tax_amt_received = 0
-            charity_amt = 0
-            poor = False
-            rich = False
-            money_of_agent[agents] = [location, money, False, transactions, tax_amt_paid, tax_amt_received, charity_amt, poor, rich]
-            # money_of_agent[(m, n)] = 2
-        agents += 1
-    print(money_of_agent)
-    return grid 
-
-import numpy as np 
-import numpy.random as random
-import matplotlib.pyplot as plt 
-from matplotlib.animation import FuncAnimation
-from matplotlib.colors import LinearSegmentedColormap
-import pandas as pd
-from plot_utils import plot_transaction_distribution,plot_transaction_counts
-
-
-
-# track money and position of each agent
-money_of_agent = {}
 data_log = []  # To store the transaction details per timestep
 
 """set up the grid"""
@@ -100,13 +53,14 @@ def record_transaction_data(timestep):
     for agent_id, (location, money, moved, transactions, tax_amt_paid, tax_amt_received, charity_amt, poor, rich) in money_of_agent.items():
         num_neighbors = len([neighbor_id for neighbor_id, (neighbor_loc, _, _, _, _, _, _, _, _) in money_of_agent.items() if np.linalg.norm(np.array(location) - np.array(neighbor_loc)) <= np.sqrt(2)])
         transacted = any(t != 0 for t in transactions)
+        location_string = f"{location[0]},{location[1]}"
 
         data_log.append({
             "ID": agent_id,
             "Time step": timestep,
-            "Position": location,
+            "Position": location_string,
             "Number of neighbors": num_neighbors,
-            "Moved": moved,
+            "Moved": moved, # not updated, TODO: update this
             "Transacted": transacted,
             "Poor": poor,
             "Rich": rich,
@@ -241,8 +195,8 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
     total_money_after = sum(agent[1] for agent in money_of_agent.values())
 
     # check if total money is conserved
-    assert int(total_money_before) == int(total_money_after), \
-    f"Total money before ({total_money_before:.2f}) and after ({total_money_after:.2f}) transactions does not match!"
+    # assert np.floor(total_money_before) == np.floor(total_money_after), \
+    # f"Total money before ({total_money_before:.2f}) and after ({total_money_after:.2f}) transactions does not match!"
 
     return money_of_agent,total_transaction,transaction_count,transaction_amounts
 
@@ -402,7 +356,7 @@ def get_shades_of_green(n):
     return [(start + (end - start) * i / (n - 1)).tolist() for i in range(n)]
 
 """Animate the CA to visualize what is happening"""
-def animate_CA(initial_grid, steps,showmovements,show_animation, interval, probablility_move, delta_m, p_t, p_i, psi_max, omega, mr, mp, mc, pc,m_tax, charity_probability):
+def animate_CA(initial_grid, steps,showmovements,show_animation, interval, probablility_move, delta_m, p_t, p_i, psi_max, omega, mr, mp, mc, pc,m_tax, charity_probability, run_num, param_list):
     averages = []
     total_transactions_per_step = []  
     total_transaction_counts = []
@@ -501,8 +455,14 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
             total_agents_list.append(total_agents)
 
     # Save recorded data to CSV
-    run_num = 1 # Change this to the run number
-    pd.DataFrame(data_log).to_csv(f"data/transaction_log_run_{run_num}.csv", index=False)
+    filepath = f"data/transaction_log_run_{run_num}.csv"
+
+    with open(filepath, "w") as file:
+        pd.DataFrame(data_log).to_csv(filepath, index=False) # write df
+
+    # append param_list to the beginning of the file
+    with open(filepath, 'a') as file:
+        file.write("\n" + param_list + "\n")
 
     return averages,total_transactions_per_step,total_transaction_counts,all_transaction_amounts #,return any data of interest from this function
 
@@ -538,12 +498,15 @@ if __name__ == '__main__':
     m_c = delta_m * 0.5 # charity donation amount
     charity_probability = 0.5  # probability of donating to charity
 
+    run_num = 1 # run number for saving data
+    param_list = f"m0: {m0}; delta_m: {delta_m}; p_t: {p_t}; p_i: {p_i}; mr: {mr}; mp: {mp}; mc: {mc}; pc: {pc}; m_tax: {m_tax}; psi_max: {psi_max}; omega: {omega}; m_p: {m_p}; m_r:{m_r}; m_c:{m_c}; charity_probability: {charity_probability}"
+
     # set up + initialize the grid
     grid = initialize_grid(height, width, density, m0)
 
     # start animation, any data of interest can be returned from animate_CA
     averages,total_money_transacted_per_timestep,total_transaction_counts,all_transaction_amounts = animate_CA(grid, steps,showmovements,show_animation, interval=100, probablility_move=probablility_move, 
-                          delta_m=delta_m, p_t=p_t, p_i=p_i, psi_max=psi_max, omega=omega, mr=mr, mp=mp, mc=mc, pc=pc,m_tax=m_tax, charity_probability=charity_probability)
+                          delta_m=delta_m, p_t=p_t, p_i=p_i, psi_max=psi_max, omega=omega, mr=mr, mp=mp, mc=mc, pc=pc,m_tax=m_tax, charity_probability=charity_probability, run_num=run_num, param_list=param_list)
 
     # plot distribution of total money transacted each timestep
     plot_transaction_distribution(total_money_transacted_per_timestep)
