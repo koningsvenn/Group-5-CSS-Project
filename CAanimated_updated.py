@@ -5,6 +5,7 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
 from plot_utils import plot_transaction_distribution,plot_transaction_counts
+from tqdm import tqdm
 
 
 
@@ -72,7 +73,7 @@ def record_transaction_data(timestep, m_0):
             "Amount of tax received": tax_amt_received,
             "Amount of charity given": -1*charity_amt if charity_amt < 0 else 0,
             "Amount of charity received": charity_amt if charity_amt > 0 else 0,
-            "Total wealth": m_0 + sum(transactions) - abs(tax_amt_paid) + tax_amt_received + charity_amt
+            "Total wealth": money
         })
 
 def move(m, n, height, width):
@@ -442,7 +443,7 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
         total_agents_list = []
 
         # Run the simulation for the specified steps
-        for step in range(steps):
+        for step in tqdm(range(steps)):
             # Perform a time-step
             grid = time_step_randwalk(grid, probablility_move, showmovements=False)
 
@@ -482,7 +483,7 @@ if __name__ == '__main__':
     height = 20
     width = 20
     probablility_move = 0.8  # chance of movement of indiviudual
-    steps = 200  # timesteps
+    steps = 20000  # timesteps
     density = 0.2
 
     # animation and logging
@@ -503,8 +504,8 @@ if __name__ == '__main__':
     m_c = delta_m * 0.5 # charity donation amount
     charity_probability = 0.5  # probability of donating to charity
 
-    run_num = 9 # run number for saving data
-    param_list = f"m0: {m0}; delta_m: {delta_m}; p_t: {p_t}; p_i: {p_i}; m_tax: {m_tax}; psi_max: {psi_max}; omega: {omega}; m_p: {m_p}; m_r:{m_r}; m_c:{m_c}; charity_probability: {charity_probability}"
+    run_num = 3 # run number for saving data
+    param_list = f"m0: {m0}; delta_m: {delta_m}; p_t: {p_t}; p_i: {p_i}; m_tax: {m_tax}; psi_max: {psi_max}; omega: {omega}; m_p: {m_p}; m_r: {m_r}; m_c: {m_c}; charity_probability: {charity_probability}"
 
     # set up + initialize the grid
     grid = initialize_grid(height, width, density, m0)
