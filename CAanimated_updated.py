@@ -107,6 +107,8 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
     height, width = grid.shape
     visited = set()
 
+
+
     # calculate total money before transactions
     total_money_before = sum(agent[1] for agent in money_of_agent.values())
 
@@ -236,6 +238,8 @@ def tax(money_of_agent, delta_m, psi_max, omega, m_tax):
         if money > m_tax:
             psi_i = ((money / m_max) ** omega) * psi_max  # calculate average tax rate 
             tax_liability = psi_i * delta_m  # calculate 
+            # round tax liability to 2 decimal places
+            tax_liability = round(tax_liability, 2)
             money_of_agent[agent_id][1] -= tax_liability  # deduct tax liability from the agent's money
             money_of_agent[agent_id][4] = tax_liability  # log tax amount
             total_tax_revenue += tax_liability  # add to total tax revenue
@@ -243,6 +247,8 @@ def tax(money_of_agent, delta_m, psi_max, omega, m_tax):
 
     # redistribute tax revenue equally
     redistribution = total_tax_revenue / len(money_of_agent)
+    # round redistributed amount to 2 decimal places
+    redistribution = round(redistribution, 2)
 
     for agent_id in money_of_agent:
         money_of_agent[agent_id][1] += redistribution  # add redistributed amount to each agent's money
@@ -288,6 +294,8 @@ def charity(money_of_agent, m_r, m_p, m_c, charity_probability):
         
         if total_charity_revenue > 0:
             charity_redistribution = total_charity_revenue / len(poor_agents)
+            # round redistributed amount to 2 decimal places
+            charity_redistribution = round(charity_redistribution, 2)
             for agent_id in poor_agents:
                 money_of_agent[agent_id][7] = True
                 money_of_agent[agent_id][1] += charity_redistribution
@@ -488,12 +496,12 @@ if __name__ == '__main__':
 
     # animation and logging
     showmovements = False
-    show_animation = False
+    show_animation = True
 
-    m0 = 100
-    delta_m = m0/100
-    p_t = 0.7
-    p_i = 0.0574
+    m0 = 100 # starting money   
+    delta_m = m0/100 # amount exchanged in transaction
+    p_t = 0.7 # probability of transaction
+    p_i = 0.0574 # inequality parameter
 
     m_tax = m0 / 2  # critical threshold for taxation
     psi_max = 0.5   # maximum tax rate (adjustable)
