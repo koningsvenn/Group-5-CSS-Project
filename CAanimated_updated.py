@@ -34,24 +34,26 @@ def initialize_grid(height, width, density, m0):
             # add agent info
             location = [m, n]
             money = m0
+            win=False
+            moved_tracker=False
             transactions = []
             tax_amt_paid = 0
             tax_amt_received = 0
             charity_amt = 0
             poor = False
             rich = False
-            money_of_agent[agents] = [location, money, False, transactions, tax_amt_paid, tax_amt_received, charity_amt, poor, rich]
+            money_of_agent[agents] = [location, money, win, transactions, tax_amt_paid, tax_amt_received, charity_amt, poor, rich, moved_tracker]
             # money_of_agent[(m, n)] = 2
         agents += 1
     # print(money_of_agent)
     return grid 
 
 
-def record_transaction_data(timestep):
+def record_transaction_data(timestep, m_0):
     global data_log
 
-    for agent_id, (location, money, moved, transactions, tax_amt_paid, tax_amt_received, charity_amt, poor, rich) in money_of_agent.items():
-        num_neighbors = len([neighbor_id for neighbor_id, (neighbor_loc, _, _, _, _, _, _, _, _) in money_of_agent.items() if np.linalg.norm(np.array(location) - np.array(neighbor_loc)) <= np.sqrt(2)])
+    for agent_id, (location, money, win, transactions, tax_amt_paid, tax_amt_received, charity_amt, poor, rich, moved_tracker) in money_of_agent.items():
+        num_neighbors = len([neighbor_id for neighbor_id, (neighbor_loc, _, _, _, _, _, _, _, _, _) in money_of_agent.items() if np.linalg.norm(np.array(location) - np.array(neighbor_loc)) <= np.sqrt(2)])
         transacted = any(t != 0 for t in transactions)
         location_string = f"{location[0]},{location[1]}"
 
@@ -60,15 +62,17 @@ def record_transaction_data(timestep):
             "Time step": timestep,
             "Position": location_string,
             "Number of neighbors": num_neighbors,
-            "Moved": moved, # not updated, TODO: update this
+            "Moved": moved_tracker,
             "Transacted": transacted,
+            "Won": win,	
             "Poor": poor,
             "Rich": rich,
-            "Amount of income gained/lost": sum(transactions),
+            "Amount of income gained/lost": [transactions[-1] if len(transactions) > 0 else 0][0],
             "Amount of tax paid": tax_amt_paid,
             "Amount of tax received": tax_amt_received,
             "Amount of charity given": -1*charity_amt if charity_amt < 0 else 0,
-            "Amount of charity received": charity_amt if charity_amt > 0 else 0
+            "Amount of charity received": charity_amt if charity_amt > 0 else 0,
+            "Total wealth": m_0 + sum(transactions) - abs(tax_amt_paid) + tax_amt_received + charity_amt
         })
 
 def move(m, n, height, width):
@@ -106,7 +110,7 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
     total_money_before = sum(agent[1] for agent in money_of_agent.values())
 
     # iterate over all agents
-    for agent_id, (location, money, win, transactions, tax_paid, tax_rec, charity, poor, rich) in money_of_agent.items():
+    for agent_id, (location, money, win, transactions, tax_paid, tax_rec, charity, poor, rich, moved_tracker) in money_of_agent.items():
         m, n = location
         neighbors = []
 
@@ -117,7 +121,7 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
                     continue
                 m_new, n_new = (m + i) % height, (n + j) % width
                 if grid[m_new, n_new] == 1:  # check if a neighbor is present
-                    for neighbor_id, (neighbor_loc, neighbor_money, n_win, n_transactions, n_tax_paid, n_tax_received, n_charity, n_poor, n_rich) in money_of_agent.items():
+                    for neighbor_id, (neighbor_loc, neighbor_money, n_win, n_transactions, n_tax_paid, n_tax_received, n_charity, n_poor, n_rich, n_moved_tracker) in money_of_agent.items():
                         if neighbor_loc == [m_new, n_new]:
                             neighbors.append((neighbor_id, neighbor_loc, neighbor_money))
                             break
@@ -139,6 +143,7 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
                     money_of_agent[neighbor_id][1] -= delta_m
                     money_of_agent[neighbor_id][3].append(-delta_m) # log transaction
                     money_of_agent[agent_id][2] = True
+                    money_of_agent[neighbor_id][2] = False
                     total_transaction += delta_m
                     transaction_count += 1
                     transaction_amounts.append(delta_m)
@@ -150,6 +155,7 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
                     money_of_agent[neighbor_id][1] -= delta_m
                     money_of_agent[neighbor_id][3].append(-delta_m)
                     money_of_agent[agent_id][2] = True
+                    money_of_agent[neighbor_id][2] = False
                     total_transaction += delta_m
                     transaction_count += 1
                     transaction_amounts.append(delta_m)
@@ -161,6 +167,7 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
                     money_of_agent[neighbor_id][1] += delta_m
                     money_of_agent[neighbor_id][3].append(delta_m)
                     money_of_agent[neighbor_id][2] = True
+                    money_of_agent[agent_id][2] = False
                     total_transaction += delta_m
                     transaction_count += 1
                     transaction_amounts.append(delta_m)
@@ -172,6 +179,7 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
                     money_of_agent[neighbor_id][1] -= delta_m
                     money_of_agent[neighbor_id][3].append(-delta_m)
                     money_of_agent[agent_id][2] = True
+                    money_of_agent[neighbor_id][2] = False
                     total_transaction += delta_m
                     transaction_count += 1
                     transaction_amounts.append(delta_m)
@@ -182,6 +190,7 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
                     money_of_agent[neighbor_id][1] += delta_m
                     money_of_agent[neighbor_id][3].append(delta_m)
                     money_of_agent[neighbor_id][2] = True
+                    money_of_agent[agent_id][2] = False
                     total_transaction += delta_m
                     transaction_count += 1
                     transaction_amounts.append(delta_m)
@@ -217,17 +226,17 @@ def tax(money_of_agent, delta_m, psi_max, omega, m_tax):
     total_tax_revenue = 0  # initialize total tax revenue
     m_max = max(agent[1] for agent in money_of_agent.values())  # find the max money among agents
 
-    winner_agents = [agent_id for agent_id, (location, money, win, transaction, tax_paid, tax_rec, charity, poor, rich) in money_of_agent.items() if win == True]
+    winner_agents = [agent_id for agent_id, (location, money, win, transaction, tax_paid, tax_rec, charity, poor, rich,moved_tracker) in money_of_agent.items() if win == True]
     # calculate tax liability and collect tax revenue
     for agent_id in winner_agents:
         money = money_of_agent[agent_id][1]
         #update win to false
-        money_of_agent[agent_id][2] = False
+        # money_of_agent[agent_id][2] = False
         if money > m_tax:
             psi_i = ((money / m_max) ** omega) * psi_max  # calculate average tax rate 
             tax_liability = psi_i * delta_m  # calculate 
             money_of_agent[agent_id][1] -= tax_liability  # deduct tax liability from the agent's money
-            money_of_agent[agent_id][4] += tax_liability  # log tax amount
+            money_of_agent[agent_id][4] = tax_liability  # log tax amount
             total_tax_revenue += tax_liability  # add to total tax revenue
 
 
@@ -236,7 +245,7 @@ def tax(money_of_agent, delta_m, psi_max, omega, m_tax):
 
     for agent_id in money_of_agent:
         money_of_agent[agent_id][1] += redistribution  # add redistributed amount to each agent's money
-        money_of_agent[agent_id][5] += redistribution  # log tax amount received
+        money_of_agent[agent_id][5] = redistribution  # log tax amount received
 
     # ensure no agent has negative money
     for agent_id in money_of_agent:
@@ -265,16 +274,16 @@ def charity(money_of_agent, m_r, m_p, m_c, charity_probability):
     total_charity_revenue = 0  # initialize total charity revenue
     R = random.random()  # random probability
      # Define poor agents (money < m_p) and rich agents (money > m_r)
-    poor_agents = [agent_id for agent_id, (location, money, win, transactions, tax_paid, tax_rec, charity, poor, rich) in money_of_agent.items() if money < m_p]
-    rich_agents = [agent_id for agent_id, (location, money, win, transactions, tax_paid, tax_rec, charity, poor, rich) in money_of_agent.items() if money > m_r]
-
+    poor_agents = [agent_id for agent_id, (location, money, win, transactions, tax_paid, tax_rec, charity, poor, rich, moved_tracker) in money_of_agent.items() if money < m_p]
+    rich_agents = [agent_id for agent_id, (location, money, win, transactions, tax_paid, tax_rec, charity, poor, rich, moved_tracker) in money_of_agent.items() if money > m_r and win == True]
+    print('rich agents exist?:', len(rich_agents))
     # calculate charity contributions and collect charity revenue
     if len(rich_agents) > 0 and len(poor_agents) > 0:
         for agent_id in rich_agents:
             money_of_agent[agent_id][8] = True
-            if R < charity_probability:  # agent is rich and donates
+            if R < charity_probability:  # agent is rich and has won and donates
                 money_of_agent[agent_id][1] -= m_c  # deduct charity contribution from the agent's money
-                money_of_agent[agent_id][6] -= m_c  # log charity amount
+                money_of_agent[agent_id][6] = -m_c  # log charity amount
                 total_charity_revenue += m_c  # add to total charity pool
         
         if total_charity_revenue > 0:
@@ -282,7 +291,7 @@ def charity(money_of_agent, m_r, m_p, m_c, charity_probability):
             for agent_id in poor_agents:
                 money_of_agent[agent_id][7] = True
                 money_of_agent[agent_id][1] += charity_redistribution
-                money_of_agent[agent_id][6] += charity_redistribution
+                money_of_agent[agent_id][6] = charity_redistribution
 
     # ensure no agent has negative money
     for agent_id in money_of_agent:
@@ -322,6 +331,7 @@ def time_step_randwalk(grid, probablility_move,showmovements):
                 # random movement
                 if random.random() < probablility_move:  # move with some probability
                     m_new, n_new = globals()['move'](m, n, height, width)  # explicitly use the global move function
+                    money_of_agent[agent_id][9] = True  # log movement
 
 
                     # add the person to the grid if the cell is empty and not visited
@@ -356,7 +366,7 @@ def get_shades_of_green(n):
     return [(start + (end - start) * i / (n - 1)).tolist() for i in range(n)]
 
 """Animate the CA to visualize what is happening"""
-def animate_CA(initial_grid, steps,showmovements,show_animation, interval, probablility_move, delta_m, p_t, p_i, psi_max, omega, mr, mp, mc, pc,m_tax, charity_probability, run_num, param_list):
+def animate_CA(initial_grid, steps,showmovements,show_animation, interval, probablility_move, m_0, delta_m, p_t, p_i, psi_max, omega, m_r, m_p, m_c, m_tax, charity_probability, run_num, param_list):
     averages = []
     total_transactions_per_step = []  
     total_transaction_counts = []
@@ -400,7 +410,7 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
             
             
             money_of_agent = tax(money_of_agent, delta_m, psi_max, omega, m_tax)
-            money_of_agent = charity(money_of_agent, mr, mp, mc, charity_probability)
+            money_of_agent = charity(money_of_agent, m_r, m_p, m_c, charity_probability)
             
             # record_transaction_data(step) # Record transaction data at this step
 
@@ -413,7 +423,7 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
                     text[i][j].set_text('')  # Clear previous text
 
             # Display money values for agents
-            for agent_id, (location, money, win, transactions, tax_paid, tax_rec, charity_rec, poor, rich) in money_of_agent.items():
+            for agent_id, (location, money, win, transactions, tax_paid, tax_rec, charity_rec, poor, rich, moved_tracker) in money_of_agent.items():
                 m, n = location  # Agent's location in the grid
                 text[m][n].set_text(f'{int(money)}')  # Display agent's money
                 text[m][n].set_color('white' if money > 2 else 'black')  # Adjust text color for better contrast
@@ -444,13 +454,13 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
             all_transaction_amounts.extend(transaction_amounts)
 
             money_of_agent = tax(money_of_agent, delta_m, psi_max, omega, m_tax)
-            money_of_agent = charity(money_of_agent, mr, mp, mc, charity_probability)
+            money_of_agent = charity(money_of_agent, m_r, m_p, m_c, charity_probability)
 
-            record_transaction_data(step) # Record transaction data at this step
+            record_transaction_data(step, m_0) # Record transaction data at this step
 
             # Collect data at this step if needed
             
-            average_money = np.mean([money for _, (_, money, _, _, _, _, _, _, _) in money_of_agent.items()])  
+            average_money = np.mean([money for _, (_, money, _, _, _, _, _, _, _, _) in money_of_agent.items()])  
             total_agents = len(money_of_agent)
             total_agents_list.append(total_agents)
 
@@ -484,10 +494,6 @@ if __name__ == '__main__':
     delta_m = m0/100
     p_t = 0.7
     p_i = 0.0574
-    mr = 1.0
-    mp = 1.0
-    mc = 1.0
-    pc = 1.0
 
     m_tax = m0 / 2  # critical threshold for taxation
     psi_max = 0.5   # maximum tax rate (adjustable)
@@ -498,15 +504,15 @@ if __name__ == '__main__':
     m_c = delta_m * 0.5 # charity donation amount
     charity_probability = 0.5  # probability of donating to charity
 
-    run_num = 7 # run number for saving data
-    param_list = f"m0: {m0}; delta_m: {delta_m}; p_t: {p_t}; p_i: {p_i}; mr: {mr}; mp: {mp}; mc: {mc}; pc: {pc}; m_tax: {m_tax}; psi_max: {psi_max}; omega: {omega}; m_p: {m_p}; m_r:{m_r}; m_c:{m_c}; charity_probability: {charity_probability}"
+    run_num = 9 # run number for saving data
+    param_list = f"m0: {m0}; delta_m: {delta_m}; p_t: {p_t}; p_i: {p_i}; m_tax: {m_tax}; psi_max: {psi_max}; omega: {omega}; m_p: {m_p}; m_r:{m_r}; m_c:{m_c}; charity_probability: {charity_probability}"
 
     # set up + initialize the grid
     grid = initialize_grid(height, width, density, m0)
 
     # start animation, any data of interest can be returned from animate_CA
-    averages,total_money_transacted_per_timestep,total_transaction_counts,all_transaction_amounts = animate_CA(grid, steps,showmovements,show_animation, interval=100, probablility_move=probablility_move, 
-                          delta_m=delta_m, p_t=p_t, p_i=p_i, psi_max=psi_max, omega=omega, mr=mr, mp=mp, mc=mc, pc=pc,m_tax=m_tax, charity_probability=charity_probability, run_num=run_num, param_list=param_list)
+    averages,total_money_transacted_per_timestep,total_transaction_counts,all_transaction_amounts = animate_CA(grid, steps,showmovements,show_animation, interval=100, probablility_move=probablility_move, m_0=m0, \
+                          delta_m=delta_m, p_t=p_t, p_i=p_i, psi_max=psi_max, omega=omega, m_r=m_r, m_p=m_p, m_c=m_c, m_tax=m_tax, charity_probability=charity_probability, run_num=run_num, param_list=param_list)
 
     # plot distribution of total money transacted each timestep
     plot_transaction_distribution(total_money_transacted_per_timestep)
