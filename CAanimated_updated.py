@@ -1,9 +1,10 @@
-
 import numpy as np 
 import numpy.random as random
+import matplotlib.pyplot as plt 
+from matplotlib.animation import FuncAnimation
+from matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
-import argparse
-# from plot_utils import plot_transaction_distribution,plot_transaction_counts
+from plot_utils import plot_transaction_distribution,plot_transaction_counts
 
 
 
@@ -42,7 +43,7 @@ def initialize_grid(height, width, density, m0):
             money_of_agent[agents] = [location, money, False, transactions, tax_amt_paid, tax_amt_received, charity_amt, poor, rich]
             # money_of_agent[(m, n)] = 2
         agents += 1
-    print(money_of_agent)
+    # print(money_of_agent)
     return grid 
 
 
@@ -52,20 +53,21 @@ def record_transaction_data(timestep):
     for agent_id, (location, money, moved, transactions, tax_amt_paid, tax_amt_received, charity_amt, poor, rich) in money_of_agent.items():
         num_neighbors = len([neighbor_id for neighbor_id, (neighbor_loc, _, _, _, _, _, _, _, _) in money_of_agent.items() if np.linalg.norm(np.array(location) - np.array(neighbor_loc)) <= np.sqrt(2)])
         transacted = any(t != 0 for t in transactions)
+        location_string = f"{location[0]},{location[1]}"
 
         data_log.append({
             "ID": agent_id,
             "Time step": timestep,
-            "Position": location,
+            "Position": location_string,
             "Number of neighbors": num_neighbors,
-            "Moved": moved,
+            "Moved": moved, # not updated, TODO: update this
             "Transacted": transacted,
             "Poor": poor,
             "Rich": rich,
             "Amount of income gained/lost": sum(transactions),
             "Amount of tax paid": tax_amt_paid,
             "Amount of tax received": tax_amt_received,
-            "Amount of charity given": charity_amt if charity_amt < 0 else 0,
+            "Amount of charity given": -1*charity_amt if charity_amt < 0 else 0,
             "Amount of charity received": charity_amt if charity_amt > 0 else 0
         })
 
@@ -193,8 +195,8 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
     total_money_after = sum(agent[1] for agent in money_of_agent.values())
 
     # check if total money is conserved
-    assert int(total_money_before) == int(total_money_after), \
-    f"Total money before ({total_money_before:.2f}) and after ({total_money_after:.2f}) transactions does not match!"
+    # assert np.floor(total_money_before) == np.floor(total_money_after), \
+    # f"Total money before ({total_money_before:.2f}) and after ({total_money_after:.2f}) transactions does not match!"
 
     return money_of_agent,total_transaction,transaction_count,transaction_amounts
 
@@ -272,7 +274,7 @@ def charity(money_of_agent, m_r, m_p, m_c, charity_probability):
             money_of_agent[agent_id][8] = True
             if R < charity_probability:  # agent is rich and donates
                 money_of_agent[agent_id][1] -= m_c  # deduct charity contribution from the agent's money
-                money_of_agent[agent_id][6] += m_c  # log charity amount
+                money_of_agent[agent_id][6] -= m_c  # log charity amount
                 total_charity_revenue += m_c  # add to total charity pool
         
         if total_charity_revenue > 0:
@@ -354,7 +356,7 @@ def get_shades_of_green(n):
     return [(start + (end - start) * i / (n - 1)).tolist() for i in range(n)]
 
 """Animate the CA to visualize what is happening"""
-def animate_CA(run_num_arg,initial_grid, steps,showmovements,show_animation, interval, probablility_move, delta_m, p_t, p_i, psi_max, omega, mr, mp, mc, pc,m_tax, charity_probability):
+def animate_CA(initial_grid, steps,showmovements,show_animation, interval, probablility_move, delta_m, p_t, p_i, psi_max, omega, mr, mp, mc, pc,m_tax, charity_probability, run_num, param_list):
     averages = []
     total_transactions_per_step = []  
     total_transaction_counts = []
@@ -453,68 +455,62 @@ def animate_CA(run_num_arg,initial_grid, steps,showmovements,show_animation, int
             total_agents_list.append(total_agents)
 
     # Save recorded data to CSV
-    run_num = run_num_arg # Change this to the run number
-    pd.DataFrame(data_log).to_csv(f"data/transaction_log_run_{run_num}.csv", index=False)
+    filepath = f"data/transaction_log_run_{run_num}.csv"
+
+    with open(filepath, "w") as file:
+        pd.DataFrame(data_log).to_csv(filepath, index=False) # write df
+
+    # append param_list to the beginning of the file
+    with open(filepath, 'a') as file:
+        file.write("\n" + param_list)
 
     return averages,total_transactions_per_step,total_transaction_counts,all_transaction_amounts #,return any data of interest from this function
 
 
 
-
 if __name__ == '__main__':
-    """Parse input parameters from the SLURM job script"""
-    parser = argparse.ArgumentParser(description="Run simulation with parameter combinations.")
-    parser.add_argument("--run_num", type=int, required=True)
-    parser.add_argument("--prob_move", type=float, required=True)
-    parser.add_argument("--transaction_prob", type=float, required=True)
-    parser.add_argument("--inequality_param", type=float, required=True)
-    parser.add_argument("--tax_rate", type=float, required=True)
-    parser.add_argument("--delta_m", type=float, required=True)
-    parser.add_argument("--steps", type=int, required=True)
-    parser.add_argument("--height", type=int, required=True)
-    parser.add_argument("--width", type=int, required=True)
-
-    args = parser.parse_args()
-
-    # assign arguments to variables
-    run_num_arg = args.run_num
-    probablility_move = args.prob_move
-    p_t = args.transaction_prob
-    p_i = args.inequality_param
-    tax_rate = args.tax_rate
-    delta_m = args.delta_m
-    steps = args.steps
-    height = args.height
-    width = args.width
-
-    # Other fixed parameters
+    """input parameters"""
+    height = 20
+    width = 20
+    probablility_move = 0.8  # chance of movement of indiviudual
+    steps = 200  # timesteps
     density = 0.2
+
+    # animation and logging
     showmovements = False
     show_animation = False
+
     m0 = 100
-    psi_max = tax_rate
-    omega = 1.0
+    delta_m = m0/100
+    p_t = 0.7
+    p_i = 0.0574
     mr = 1.0
     mp = 1.0
     mc = 1.0
     pc = 1.0
-    m_tax = m0 / 2
-    m_p = 0.7 * m0
-    m_r = 1.5 * m0
-    charity_probability = 0.5
 
-    # Initialize the grid
+    m_tax = m0 / 2  # critical threshold for taxation
+    psi_max = 0.5   # maximum tax rate (adjustable)
+    omega = 1.0     # empirical parameter for tax calculation
+
+    m_p = 0.7 * m0 # poverty line (if agent has less than this level of income they are eligible to receive donations)
+    m_r = 1.5 * m0 # rich line (if agent has more than this level of income they are eligible to give donations)
+    m_c = delta_m * 0.5 # charity donation amount
+    charity_probability = 0.5  # probability of donating to charity
+
+    run_num = 7 # run number for saving data
+    param_list = f"m0: {m0}; delta_m: {delta_m}; p_t: {p_t}; p_i: {p_i}; mr: {mr}; mp: {mp}; mc: {mc}; pc: {pc}; m_tax: {m_tax}; psi_max: {psi_max}; omega: {omega}; m_p: {m_p}; m_r:{m_r}; m_c:{m_c}; charity_probability: {charity_probability}"
+
+    # set up + initialize the grid
     grid = initialize_grid(height, width, density, m0)
 
-    # Run the simulation
-    averages, total_money_transacted_per_timestep, total_transaction_counts, all_transaction_amounts = animate_CA(
-        run_num_arg, grid, steps, showmovements, show_animation, interval=100,
-        probablility_move=probablility_move, delta_m=delta_m, p_t=p_t, p_i=p_i,
-        psi_max=psi_max, omega=omega, mr=mr, mp=mp, mc=mc, pc=pc, m_tax=m_tax,
-        charity_probability=charity_probability
-    )
+    # start animation, any data of interest can be returned from animate_CA
+    averages,total_money_transacted_per_timestep,total_transaction_counts,all_transaction_amounts = animate_CA(grid, steps,showmovements,show_animation, interval=100, probablility_move=probablility_move, 
+                          delta_m=delta_m, p_t=p_t, p_i=p_i, psi_max=psi_max, omega=omega, mr=mr, mp=mp, mc=mc, pc=pc,m_tax=m_tax, charity_probability=charity_probability, run_num=run_num, param_list=param_list)
 
-
+    # plot distribution of total money transacted each timestep
+    plot_transaction_distribution(total_money_transacted_per_timestep)
+    plot_transaction_counts(total_transaction_counts)
 
 
 

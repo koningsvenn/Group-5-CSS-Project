@@ -1,0 +1,12 @@
+# Purpose: Ignore files and directories in git
+
+# OS generated files #
+######################
+.DS_Store
+
+# Ignore __pycache__ directories
+__pycache__/
+
+# Ignore results directory
+results/
+data/

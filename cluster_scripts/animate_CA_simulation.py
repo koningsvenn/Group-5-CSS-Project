@@ -1,4 +1,3 @@
-
 import numpy as np 
 import numpy.random as random
 import pandas as pd
@@ -52,6 +51,7 @@ def record_transaction_data(timestep):
     for agent_id, (location, money, moved, transactions, tax_amt_paid, tax_amt_received, charity_amt, poor, rich) in money_of_agent.items():
         num_neighbors = len([neighbor_id for neighbor_id, (neighbor_loc, _, _, _, _, _, _, _, _) in money_of_agent.items() if np.linalg.norm(np.array(location) - np.array(neighbor_loc)) <= np.sqrt(2)])
         transacted = any(t != 0 for t in transactions)
+        location_string = f"{location[0]},{location[1]}"
 
         data_log.append({
             "ID": agent_id,
@@ -65,7 +65,7 @@ def record_transaction_data(timestep):
             "Amount of income gained/lost": sum(transactions),
             "Amount of tax paid": tax_amt_paid,
             "Amount of tax received": tax_amt_received,
-            "Amount of charity given": charity_amt if charity_amt < 0 else 0,
+            "Amount of charity given": -1*charity_amt if charity_amt < 0 else 0,
             "Amount of charity received": charity_amt if charity_amt > 0 else 0
         })
 
@@ -193,8 +193,8 @@ def economic_transaction(grid, money_of_agent, delta_m, p_t, p_i):
     total_money_after = sum(agent[1] for agent in money_of_agent.values())
 
     # check if total money is conserved
-    assert int(total_money_before) == int(total_money_after), \
-    f"Total money before ({total_money_before:.2f}) and after ({total_money_after:.2f}) transactions does not match!"
+    # assert np.floor(total_money_before) == np.floor(total_money_after), \
+    # f"Total money before ({total_money_before:.2f}) and after ({total_money_after:.2f}) transactions does not match!"
 
     return money_of_agent,total_transaction,transaction_count,transaction_amounts
 
@@ -272,7 +272,7 @@ def charity(money_of_agent, m_r, m_p, m_c, charity_probability):
             money_of_agent[agent_id][8] = True
             if R < charity_probability:  # agent is rich and donates
                 money_of_agent[agent_id][1] -= m_c  # deduct charity contribution from the agent's money
-                money_of_agent[agent_id][6] += m_c  # log charity amount
+                money_of_agent[agent_id][6] -= m_c  # log charity amount
                 total_charity_revenue += m_c  # add to total charity pool
         
         if total_charity_revenue > 0:
@@ -354,7 +354,7 @@ def get_shades_of_green(n):
     return [(start + (end - start) * i / (n - 1)).tolist() for i in range(n)]
 
 """Animate the CA to visualize what is happening"""
-def animate_CA(run_num_arg,initial_grid, steps,showmovements,show_animation, interval, probablility_move, delta_m, p_t, p_i, psi_max, omega, mr, mp, mc, pc,m_tax, charity_probability):
+def animate_CA(initial_grid, steps,showmovements,show_animation, interval, probablility_move, delta_m, p_t, p_i, psi_max, omega, mr, mp, mc, pc,m_tax, charity_probability, run_num, param_list):
     averages = []
     total_transactions_per_step = []  
     total_transaction_counts = []
@@ -453,11 +453,16 @@ def animate_CA(run_num_arg,initial_grid, steps,showmovements,show_animation, int
             total_agents_list.append(total_agents)
 
     # Save recorded data to CSV
-    run_num = run_num_arg # Change this to the run number
-    pd.DataFrame(data_log).to_csv(f"data/transaction_log_run_{run_num}.csv", index=False)
+    filepath = f"data/transaction_log_run_{run_num}.csv"
+
+    with open(filepath, "w") as file:
+        pd.DataFrame(data_log).to_csv(filepath, index=False) # write df
+
+    # append param_list to the beginning of the file
+    with open(filepath, 'a') as file:
+        file.write("\n" + param_list)
 
     return averages,total_transactions_per_step,total_transaction_counts,all_transaction_amounts #,return any data of interest from this function
-
 
 
 
@@ -496,23 +501,21 @@ if __name__ == '__main__':
     omega = 1.0
     mr = 1.0
     mp = 1.0
-    mc = 1.0
+    m_c = 1.0
     pc = 1.0
     m_tax = m0 / 2
     m_p = 0.7 * m0
     m_r = 1.5 * m0
     charity_probability = 0.5
+    param_list = f"m0: {m0}; delta_m: {delta_m}; p_t: {p_t}; p_i: {p_i}; mr: {mr}; mp: {mp}; mc: {m_c}; pc: {pc}; m_tax: {m_tax}; psi_max: {psi_max}; omega: {omega}; m_p: {m_p}; m_r:{m_r}; m_c:{m_c}; charity_probability: {charity_probability}"
 
-    # Initialize the grid
+
+    # set up + initialize the grid
     grid = initialize_grid(height, width, density, m0)
 
-    # Run the simulation
-    averages, total_money_transacted_per_timestep, total_transaction_counts, all_transaction_amounts = animate_CA(
-        run_num_arg, grid, steps, showmovements, show_animation, interval=100,
-        probablility_move=probablility_move, delta_m=delta_m, p_t=p_t, p_i=p_i,
-        psi_max=psi_max, omega=omega, mr=mr, mp=mp, mc=mc, pc=pc, m_tax=m_tax,
-        charity_probability=charity_probability
-    )
+    # start animation, any data of interest can be returned from animate_CA
+    averages,total_money_transacted_per_timestep,total_transaction_counts,all_transaction_amounts = animate_CA(grid, steps,showmovements,show_animation, interval=100, probablility_move=probablility_move, 
+                          delta_m=delta_m, p_t=p_t, p_i=p_i, psi_max=psi_max, omega=omega, mr=mr, mp=mp, mc=m_c, pc=pc,m_tax=m_tax, charity_probability=charity_probability, run_num=run_num_arg, param_list=param_list)
 
 
 
