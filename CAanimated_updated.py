@@ -276,7 +276,6 @@ def charity(money_of_agent, m_r, m_p, m_c, charity_probability):
      # Define poor agents (money < m_p) and rich agents (money > m_r)
     poor_agents = [agent_id for agent_id, (location, money, win, transactions, tax_paid, tax_rec, charity, poor, rich, moved_tracker) in money_of_agent.items() if money < m_p]
     rich_agents = [agent_id for agent_id, (location, money, win, transactions, tax_paid, tax_rec, charity, poor, rich, moved_tracker) in money_of_agent.items() if money > m_r and win == True]
-    print('rich agents exist?:', len(rich_agents))
     # calculate charity contributions and collect charity revenue
     if len(rich_agents) > 0 and len(poor_agents) > 0:
         for agent_id in rich_agents:
