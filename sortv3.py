@@ -55,7 +55,7 @@ for file in csv_files:
         if psi_max in psi_max_values and m_c in m_c_values:
             target_folder = os.path.join(destination_base, f"grid_{grid_size}x{grid_size}", f"varying_m_c_psi_max_{psi_max:.1f}")
             os.makedirs(target_folder, exist_ok=True)
-            shutil.move(file, os.path.join(target_folder, os.path.basename(file)))
+            shutil.copy2(file, os.path.join(target_folder, os.path.basename(file)))
 
     except Exception as e:
         print(f"Error processing {file}: {e}")
