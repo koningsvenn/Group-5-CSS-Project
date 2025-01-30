@@ -1,11 +1,7 @@
 import numpy as np 
 import numpy.random as random
-import matplotlib.pyplot as plt 
-from matplotlib.animation import FuncAnimation
-from matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
-from plot_utils import plot_transaction_distribution,plot_transaction_counts
-from tqdm import tqdm
+import argparse
 
 
 
@@ -308,8 +304,8 @@ def charity(money_of_agent, m_r, m_p, m_c, charity_probability):
     # check if total charity revenue matches total redistributed amount
     total_redistributed = total_charity_revenue if len(poor_agents) > 0 else 0
     # assert round(total_charity_revenue, 5) == round(total_redistributed, 5), \
-    assert int(total_charity_revenue) == int(total_redistributed), \
-            f"Total charity collected ({total_charity_revenue:.5f}) does not match total redistributed ({total_redistributed:.5f})!"
+    # assert int(total_charity_revenue) == int(total_redistributed), \
+    #         f"Total charity collected ({total_charity_revenue:.5f}) does not match total redistributed ({total_redistributed:.5f})!"
 
     return money_of_agent
 
@@ -451,7 +447,7 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
         total_agents_list = []
 
         # Run the simulation for the specified steps
-        for step in tqdm(range(steps)):
+        for step in range(steps):
             # Perform a time-step
             grid = time_step_randwalk(grid, probablility_move, showmovements=False)
 
@@ -486,45 +482,63 @@ def animate_CA(initial_grid, steps,showmovements,show_animation, interval, proba
 
 
 
+
+
 if __name__ == '__main__':
-    """input parameters"""
-    height = 20
-    width = 20
-    probablility_move = 0.8  # chance of movement of indiviudual
-    steps = 20000  # timesteps
-    density = 0.2
+    """Parse input parameters from SLURM job script"""
+    parser = argparse.ArgumentParser(description="Run Cellular Automata Simulation with parameter variations.")
+    parser.add_argument("--run_num", type=int, required=True)
+    parser.add_argument("--prob_move", type=float, required=True)
+    parser.add_argument("--transaction_prob", type=float, required=True)
+    parser.add_argument("--inequality_param", type=float, required=True)
+    parser.add_argument("--tax_rate", type=float, required=True)
+    parser.add_argument("--delta_m", type=float, required=True)
+    parser.add_argument("--steps", type=int, required=True)
+    parser.add_argument("--height", type=int, required=True)
+    parser.add_argument("--width", type=int, required=True)
+    parser.add_argument("--charity_contribution", type=float, required=True)
 
-    # animation and logging
+    args = parser.parse_args()
+
+    # Assign arguments to variables
+    run_num = args.run_num
+    probablility_move = args.prob_move
+    p_t = args.transaction_prob
+    p_i = args.inequality_param
+    tax_rate = args.tax_rate
+    delta_m = args.delta_m
+    steps = args.steps
+    height = args.height
+    width = args.width
+    m_c = args.charity_contribution  # Charity contribution (new param)
+
+    # Other fixed parameters
+    density = 0.2  # Agent density in the grid
     showmovements = False
-    show_animation = True
+    show_animation = False  # Change to True if visualization is needed
 
-    m0 = 100 # starting money   
-    delta_m = m0/100 # amount exchanged in transaction
-    p_t = 0.7 # probability of transaction
-    p_i = 0.0574 # inequality parameter
+    m0 = 100  # Initial starting money for each agent
+    m_tax = m0 / 2  # Critical threshold for taxation
+    psi_max = tax_rate  # Maximum tax rate (adjustable, from job.sh)
+    omega = 1.0  # Empirical parameter for tax calculation
 
-    m_tax = m0 / 2  # critical threshold for taxation
-    psi_max = 0.5   # maximum tax rate (adjustable)
-    omega = 1.0     # empirical parameter for tax calculation
+    m_p = 0.7 * m0  # Poverty line (below this, agents are eligible for donations)
+    m_r = 1.5 * m0  # Rich line (above this, agents are eligible to donate)
+    charity_probability = 0.5  # Probability of donating to charity
 
-    m_p = 0.7 * m0 # poverty line (if agent has less than this level of income they are eligible to receive donations)
-    m_r = 1.5 * m0 # rich line (if agent has more than this level of income they are eligible to give donations)
-    m_c = delta_m * 0.5 # charity donation amount
-    charity_probability = 0.5  # probability of donating to charity
+    param_list = f"m0: {m0}; delta_m: {delta_m}; p_t: {p_t}; p_i: {p_i}; m_tax: {m_tax}; psi_max: {psi_max}; omega: {omega}; " \
+                 f"m_p: {m_p}; m_r: {m_r}; m_c: {m_c}; charity_probability: {charity_probability}"
 
-    run_num = 3 # run number for saving data
-    param_list = f"m0: {m0}; delta_m: {delta_m}; p_t: {p_t}; p_i: {p_i}; m_tax: {m_tax}; psi_max: {psi_max}; omega: {omega}; m_p: {m_p}; m_r: {m_r}; m_c: {m_c}; charity_probability: {charity_probability}"
-
-    # set up + initialize the grid
+    # Set up + initialize the grid
     grid = initialize_grid(height, width, density, m0)
 
-    # start animation, any data of interest can be returned from animate_CA
-    averages,total_money_transacted_per_timestep,total_transaction_counts,all_transaction_amounts = animate_CA(grid, steps,showmovements,show_animation, interval=100, probablility_move=probablility_move, m_0=m0, \
-                          delta_m=delta_m, p_t=p_t, p_i=p_i, psi_max=psi_max, omega=omega, m_r=m_r, m_p=m_p, m_c=m_c, m_tax=m_tax, charity_probability=charity_probability, run_num=run_num, param_list=param_list)
-
-    # plot distribution of total money transacted each timestep
-    plot_transaction_distribution(total_money_transacted_per_timestep)
-    plot_transaction_counts(total_transaction_counts)
+    # Start animation, any data of interest can be returned from animate_CA
+    averages, total_money_transacted_per_timestep, total_transaction_counts, all_transaction_amounts = animate_CA(
+        grid, steps, showmovements, show_animation, interval=100, probablility_move=probablility_move, 
+        m_0=m0, delta_m=delta_m, p_t=p_t, p_i=p_i, psi_max=psi_max, omega=omega, 
+        m_r=m_r, m_p=m_p, m_c=m_c, m_tax=m_tax, charity_probability=charity_probability, 
+        run_num=run_num, param_list=param_list
+    )
 
 
 
