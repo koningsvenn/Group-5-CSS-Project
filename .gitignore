@@ -4,9 +4,10 @@
 ######################
 .DS_Store
 
-# Ignore __pycache__ directories
+# Ignore __pycache__ directories #
+##################################
 __pycache__/
 
-# Ignore results directory
-results/
+# Ignore results directory #
+############################
 data/
